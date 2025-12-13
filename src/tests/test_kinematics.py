@@ -1,7 +1,8 @@
-import pytest
 import numpy as np
-import frankik
+import pytest
 from scipy.spatial.transform import Rotation as R
+
+import frankik
 
 # Number of random configurations to test per robot
 N_SAMPLES = 200
@@ -9,6 +10,7 @@ N_SAMPLES = 200
 # Cartesian Tolerance (Position/Rotation matrix element difference)
 # 1e-5 corresponds to roughly 0.01mm or 0.001 degrees deviation
 CARTESIAN_TOL = 1e-4
+
 
 @pytest.fixture(autouse=True)
 def set_seed():
@@ -20,19 +22,19 @@ def generate_random_q(q_min, q_max, n=1):
     q_min = np.array(q_min)
     q_max = np.array(q_max)
     range_span = q_max - q_min
-    
+
     # 1. Generate base random values (centered 90% of range)
     unit_rand = np.random.rand(n, 7)
     q_rand = q_min + (range_span * 0.05) + unit_rand * (range_span * 0.90)
-    
+
     # 2. Singularity Avoidance
     # The Franka analytical solver has "snap-to-zero" logic for:
     # - Joint 2 (Shoulder): When q[1] is near 0
     # - Joint 6 (Wrist): When q[5] is near 0 or +/- PI
-    
+
     # Threshold in radians (approx 5 degrees to be safe)
-    singularity_threshold = 0.08 
-    
+    singularity_threshold = 0.08
+
     # Handle single sample case (1D array)
     if n == 1:
         # Avoid Shoulder Singularity (q[1] ≈ 0)
@@ -40,7 +42,7 @@ def generate_random_q(q_min, q_max, n=1):
             # Push it away from 0, preserving the sign (default to positive if 0)
             sign = np.sign(q_rand[0, 1]) if q_rand[0, 1] != 0 else 1.0
             q_rand[0, 1] = sign * singularity_threshold
-            
+
         # Avoid Wrist Singularity (q[5] ≈ 0) - though less critical for this specific bug
         if abs(q_rand[0, 5]) < singularity_threshold:
             sign = np.sign(q_rand[0, 5]) if q_rand[0, 5] != 0 else 1.0
@@ -65,18 +67,18 @@ def generate_random_q(q_min, q_max, n=1):
 def get_random_pose_in_isocube():
     """
     Generates a random pose (4x4 matrix) within the defined isocube.
-    
+
     The isocube is defined by:
     - Center: [0.498, 0.0, 0.226]
     - Half-size: [0.2, 0.2, 0.2] (Total size is 0.4 along each axis)
-    
+
     Returns:
         np.ndarray: A 4x4 homogeneous transformation matrix representing the pose.
     """
     # 1. Define the geometric bounds
     center = np.array([0.498, 0.0, 0.226])
     half_size = np.array([0.2, 0.2, 0.2])
-    
+
     lower_bound = center - half_size
     upper_bound = center + half_size
 
@@ -93,7 +95,6 @@ def get_random_pose_in_isocube():
     pose[:3, 3] = position
 
     return pose
-
 
 
 @pytest.mark.parametrize("robot_type", ["panda", "fr3"])
@@ -115,18 +116,13 @@ def test_ik_correctness_cartesian(robot_type):
 
     for i in range(N_SAMPLES):
         q_orig = generate_random_q(q_min, q_max)
-        
+
         # 1. Forward Kinematics (Get the target)
         target_pose = frankik.fk(q_orig)
         # target_pose = get_random_pose_in_isocube()
-        
+
         # 2. Inverse Kinematics
-        q_sol = frankik.ik(
-            O_T_EE=target_pose, 
-            q_actual_array=q_orig, 
-            q7=q_orig[6], 
-            is_fr3=is_fr3
-        )
+        q_sol = frankik.ik(O_T_EE=target_pose, q_actual_array=q_orig, q7=q_orig[6], is_fr3=is_fr3)
 
         # CHECK 1: Did we find a solution?
         if np.isnan(q_sol).any():
@@ -140,13 +136,15 @@ def test_ik_correctness_cartesian(robot_type):
 
         # CHECK 2: Does the solution actually reach the target? (The real test)
         pose_check = frankik.fk(q_sol)
-        
+
         # Compare 4x4 matrices
         np.testing.assert_allclose(
-            pose_check, target_pose, 
-            atol=CARTESIAN_TOL, 
-            err_msg=f"Cartesian mismatch on sample {i} for {robot_type}, q orig: {q_orig} -> q sol {q_sol}"
+            pose_check,
+            target_pose,
+            atol=CARTESIAN_TOL,
+            err_msg=f"Cartesian mismatch on sample {i} for {robot_type}, q orig: {q_orig} -> q sol {q_sol}",
         )
+
 
 @pytest.mark.parametrize("robot_type", ["panda", "fr3"])
 def test_ik_full_consistency(robot_type):
@@ -159,35 +157,36 @@ def test_ik_full_consistency(robot_type):
     else:
         q_min, q_max = frankik.q_min_fr3, frankik.q_max_fr3
         is_fr3 = True
-    
+
     for i in range(N_SAMPLES):
         q_orig = generate_random_q(q_min, q_max)
         target_pose = frankik.fk(q_orig)
         # target_pose = get_random_pose_in_isocube()
-        
+
         solutions = frankik.ik_full(
-            O_T_EE=target_pose, 
-            q_actual_array=q_orig, 
-            q7=q_orig[6], 
+            O_T_EE=target_pose,
+            q_actual_array=q_orig,
+            q7=q_orig[6],
             is_fr3=is_fr3,
         )
-        
+
         # Check every non-NaN solution
         valid_sols_count = 0
         for sol in solutions:
             if np.isnan(sol).any():
                 continue
-                
+
             valid_sols_count += 1
             pose_check = frankik.fk(sol)
-            
+
             # Every returned solution must result in the target pose
             np.testing.assert_allclose(
-                pose_check, target_pose, 
+                pose_check,
+                target_pose,
                 atol=CARTESIAN_TOL,
-                err_msg=f"One of the ik_full solutions was invalid on sample {i}"
+                err_msg=f"One of the ik_full solutions was invalid on sample {i}",
             )
-        
+
         assert valid_sols_count > 0, f"ik_full returned no valid solutions for a reachable pose {i}"
 
 
