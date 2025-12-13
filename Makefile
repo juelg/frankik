@@ -1,0 +1,65 @@
+PYSRC = src
+CPPSRC = src
+COMPILE_MODE = Release
+
+# CPP
+cppcheckformat:
+	clang-format --dry-run -Werror -i $(shell find ${CPPSRC} -name '*.cpp' -o -name '*.cc' -o -name '*.h')
+
+cppformat:
+	clang-format -Werror -i $(shell find ${CPPSRC} -name '*.cpp' -o -name '*.cc' -o -name '*.h')
+
+cpplint: 
+	clang-tidy -p=build --warnings-as-errors='*' $(shell find ${CPPSRC} -name '*.cpp' -o -name '*.cc' -name '*.h')
+
+
+gcccompile: 
+	cmake -DCMAKE_BUILD_TYPE=${COMPILE_MODE} -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -B build -G Ninja
+	cmake --build build --target _core
+
+clangcompile: 
+	cmake -DCMAKE_BUILD_TYPE=${COMPILE_MODE} -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -B build -G Ninja
+	cmake --build build --target _core
+
+# Auto generation of CPP binding stub files
+stubgen:
+	pybind11-stubgen -o src --numpy-array-use-type-var frankik
+	find ./src -name '*.pyi' -print | xargs sed -i '1s/^/# ATTENTION: auto generated from C++ code, use `make stubgen` to update!\n/'
+	find ./src -not -path "./src/frankik/_core.pyi" -name '*.pyi' -delete
+	find ./src/frankik/_core.pyi -name '*.pyi' -print | xargs sed -i 's/tuple\[typing\.Literal\[\([0-9]\+\)\], typing\.Literal\[1\]\]/tuple\[typing\.Literal[\1]\]/g'
+	find ./src/frankik/_core.pyi -name '*.pyi' -print | xargs sed -i 's/tuple\[\([M|N]\), typing\.Literal\[1\]\]/tuple\[\1\]/g'
+	ruff check --fix src/frankik/_core.pyi
+	isort src/frankik/_core.pyi
+	black src/frankik/_core.pyi
+
+
+# Python
+pycheckformat:
+	isort --check-only ${PYSRC}
+	black --check ${PYSRC}
+
+pyformat:
+	isort ${PYSRC}
+	black ${PYSRC}
+
+pylint: ruff mypy
+
+ruff:
+	ruff check ${PYSRC}
+
+mypy:
+	mypy ${PYSRC} --install-types --non-interactive --no-namespace-packages --exclude 'build'
+
+pytest:
+	pytest -vv
+
+bump:
+	cz bump
+
+commit:
+	cz commit
+
+.PHONY: cppcheckformat cppformat cpplint gcccompile clangcompile stubgen pycheckformat pyformat pylint ruff mypy  pytest bump commit
+
+
+

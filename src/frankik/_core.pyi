@@ -1,0 +1,64 @@
+# ATTENTION: auto generated from C++ code, use `make stubgen` to update!
+"""
+Python bindings for frankik IK/FK
+"""
+from __future__ import annotations
+
+import typing
+
+import numpy
+
+__all__: list[str] = ["fk", "ik", "ik_full"]
+
+def fk(
+    q: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]
+) -> numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]]:
+    """
+    Compute forward kinematics for Franka Emika Panda robot.
+
+    Args:
+        q (Vector7d): Joint angles.
+
+    Returns:
+        Eigen::Matrix<double, 4, 4>: End-effector pose.
+    """
+
+def ik(
+    O_T_EE: numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]],
+    q_actual_array: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]] = ...,
+    q7: float = 0.7853981633974483,
+    is_fr3: bool = False,
+) -> numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]:
+    """
+    Compute one inverse kinematics solution for Franka Emika Panda robot.
+
+    Args:
+        O_T_EE (Eigen::Matrix<double, 4, 4>): Desired end-effector pose.
+        q_actual_array (Vector7d, optional): Current joint angles. Defaults to kQDefault.
+        q7 (double, optional): Joint 7 angle. Defaults to M_PI_4.
+        is_fr3 (bool, optional): Whether to use FR3 joint limits. Defaults to false.
+
+    Returns:
+        Vector7d: One IK solution. NaN if no solution.
+    """
+
+def ik_full(
+    O_T_EE: numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]],
+    q_actual_array: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]] = ...,
+    q7: float = 0.7853981633974483,
+    is_fr3: bool = False,
+) -> numpy.ndarray[tuple[typing.Literal[4], typing.Literal[7]], numpy.dtype[numpy.float64]]:
+    """
+    Compute full inverse kinematics for Franka Emika Panda robot.
+
+    Args:
+        O_T_EE (Eigen::Matrix<double, 4, 4>): Desired end-effector pose.
+        q_actual_array (Vector7d, optional): Current joint angles. Defaults to kQDefault.
+        q7 (double, optional): Joint 7 angle. Defaults to M_PI_4.
+        is_fr3 (bool, optional): Whether to use FR3 joint limits. Defaults to false.
+
+    Returns:
+        Eigen::Matrix<double, 4, 7>: All possible IK solutions (up to 4). NaN if no solution.
+    """
+
+__version__: str = "0.1"

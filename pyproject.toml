@@ -1,0 +1,76 @@
+[build-system]
+requires = []
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "frankik"
+version = "0.1"
+description="Blazing fast, analytical Inverse Kinematics for Franka Emika Panda and FR3 robots. Lightweight Python bindings, no ROS required."
+readme = "README.md"
+dependencies = [
+    "numpy",
+]
+maintainers = [
+  { name = "Tobias Jülg", email = "tobias@juelg.net" },
+]
+authors = [
+  { name = "Tobias Jülg", email = "tobias@juelg.net" },
+]
+requires-python = ">=3.10"
+license = "MIT"
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.3.2",
+    "black==24.1.1",
+    "isort==5.13.2",
+    "mypy==1.10.1",
+    "types-requests~=2.31",
+    # temporarily use fixed version until PR #275 is merged
+    # pybind11-stubgen==2.5.5
+    "pybind11-stubgen @ git+https://github.com/juelg/pybind11-stubgen@fix/class-sorting",
+    "pytest==8.1.1",
+    "commitizen~=3.28.0",
+    "clang",
+    "clang-format",
+    "clang-tidy",
+]
+
+[tool.scikit-build]
+build.verbose = true
+build.targets = ["_core"]
+logging.level = "INFO"
+build-dir = "build"
+wheel.packages = ["src/frankik"]
+install.components = ["python_package"]
+
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = true
+pretty = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-vv"
+testpaths = [
+    "src/tests",
+]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "pep440"
+version_provider = "pep621"
+update_changelog_on_bump = true
+major_version_zero = true
+version_files = [
+    "CMakeLists.txt:VERSION",
+    "python/frankik/_core/__init__.pyi:__version__",
+]
