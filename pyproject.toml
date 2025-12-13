@@ -34,6 +34,7 @@ dev = [
     "clang",
     "clang-format",
     "clang-tidy",
+    "scipy",
 ]
 
 [tool.scikit-build]

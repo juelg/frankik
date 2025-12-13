@@ -8,7 +8,7 @@ import typing
 
 import numpy
 
-__all__: list[str] = ["fk", "ik", "ik_full"]
+__all__: list[str] = ["fk", "ik", "ik_full", "q_max_fr3", "q_max_panda", "q_min_fr3", "q_min_panda"]
 
 def fk(
     q: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]
@@ -62,3 +62,7 @@ def ik_full(
     """
 
 __version__: str = "0.1"
+q_max_fr3: list = [2.3093, 1.5133, 2.4937, -0.4461, 2.48, 4.2094, 2.6895]
+q_max_panda: list = [2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973]
+q_min_fr3: list = [-2.3093, -1.5133, -2.4937, -2.7478, -2.48, 0.8521, -2.6895]
+q_min_panda: list = [-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973]

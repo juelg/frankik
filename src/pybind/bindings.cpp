@@ -23,10 +23,12 @@ PYBIND11_MODULE(_core, m) {
   m.attr("__version__") = "dev";
 #endif
 
-  // auto frankik = m.def_submodule("frankik", "python bindings for frankik
-  // IK/FK");
 
-  // function ik_full
+  m.attr("q_min_panda") = frankik::q_min_panda;
+  m.attr("q_max_panda") = frankik::q_max_panda;
+  m.attr("q_min_fr3") = frankik::q_min_fr3;
+  m.attr("q_max_fr3") = frankik::q_max_fr3;
+
   m.def("ik_full", &frankik::ik_full, py::arg("O_T_EE"),
         py::arg("q_actual_array") = frankik::kQDefault, py::arg("q7") = M_PI_4, py::arg("is_fr3") = false,
         "Compute full inverse kinematics for Franka Emika Panda robot.\n\n"
@@ -39,7 +41,6 @@ PYBIND11_MODULE(_core, m) {
         "Returns:\n"
         "    Eigen::Matrix<double, 4, 7>: All possible IK solutions (up to 4). "
         "NaN if no solution.");
-  // function ik
   m.def("ik", &frankik::ik, py::arg("O_T_EE"),
         py::arg("q_actual_array") = frankik::kQDefault, py::arg("q7") = M_PI_4, py::arg("is_fr3") = false,
         "Compute one inverse kinematics solution for Franka Emika Panda "
@@ -52,7 +53,6 @@ PYBIND11_MODULE(_core, m) {
         "    is_fr3 (bool, optional): Whether to use FR3 joint limits. Defaults to false.\n\n"
         "Returns:\n"
         "    Vector7d: One IK solution. NaN if no solution.");
-  // function fk
   m.def("fk", &frankik::fk, py::arg("q"),
         "Compute forward kinematics for Franka Emika Panda robot.\n\n"
         "Args:\n"

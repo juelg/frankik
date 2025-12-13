@@ -9,75 +9,76 @@ namespace frankik {
 
 typedef Eigen::Matrix<double, 7, 1, Eigen::ColMajor> Vector7d;
 
+const double d1 = 0.3330;
+const double d3 = 0.3160;
+const double d5 = 0.3840;
+const double d7e = 0.2104;
+const double a4 = 0.0825;
+const double a7 = 0.0880;
+
+// Pre-calculated squares for IK speed
+const double LL24 = 0.10666225;     // a4^2 + d3^2
+const double LL46 = 0.15426225;     // a4^2 + d5^2
+const double L24 = 0.326591870689;  // sqrt(LL24)
+const double L46 = 0.392762332715;  // sqrt(LL46)
+
+// Pre-calculated geometric angles
+const double thetaH46 = 1.35916951803;   // atan(d5/a4);
+const double theta342 = 1.31542071191;   // atan(d3/a4);
+const double theta46H = 0.211626808766;  // acot(d5/a4);
+
 const std::array<double, 7> q_min_panda = {
     {-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973}};
 const std::array<double, 7> q_max_panda = {
     {2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973}};
-
 
 const std::array<double, 7> q_min_fr3 = {
     {-2.3093, -1.5133, -2.4937, -2.7478, -2.4800, 0.8521, -2.6895}};
 const std::array<double, 7> q_max_fr3 = {
     {2.3093, 1.5133, 2.4937, -0.4461, 2.4800, 4.2094, 2.6895}};
 
-// home pose
 const Vector7d kQDefault = (Vector7d() << 0.0, -M_PI_4, 0.0, -3 * M_PI_4, 0.0,
-                           M_PI_2, M_PI_4)
-                              .finished();
+                            M_PI_2, M_PI_4)
+                               .finished();
+
 
 Eigen::Matrix<double, 4, 7>
 ik_full(Eigen::Matrix<double, 4, 4> O_T_EE,
-        Vector7d q_actual_array = frankik::kQDefault, double q7 = M_PI_4, bool is_fr3 = false) {
+        Vector7d q_actual_array = kQDefault, double q7 = M_PI_4, bool is_fr3 = false) {
+  
   const Eigen::Matrix<double, 4, 7> q_all_NAN =
-      Eigen::Matrix<double, 4, 7>::Constant(
-          std::numeric_limits<double>::quiet_NaN());
-  const Vector7d q_NAN =
-      Vector7d::Constant(std::numeric_limits<double>::quiet_NaN());
+      Eigen::Matrix<double, 4, 7>::Constant(std::numeric_limits<double>::quiet_NaN());
+  const Vector7d q_NAN = Vector7d::Constant(std::numeric_limits<double>::quiet_NaN());
   Eigen::Matrix<double, 4, 7> q_all = q_all_NAN;
 
-  const double d1 = 0.3330;
-  const double d3 = 0.3160;
-  const double d5 = 0.3840;
-  const double d7e = 0.2104;
-  const double a4 = 0.0825;
-  const double a7 = 0.0880;
+  const std::array<double, 7> q_min = is_fr3 ? q_min_fr3 : q_min_panda;
+  const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
 
-  const double LL24 = 0.10666225;    // a4^2 + d3^2
-  const double LL46 = 0.15426225;    // a4^2 + d5^2
-  const double L24 = 0.326591870689; // sqrt(LL24)
-  const double L46 = 0.392762332715; // sqrt(LL46)
-
-  const double thetaH46 = 1.35916951803;  // atan(d5/a4);
-  const double theta342 = 1.31542071191;  // atan(d3/a4);
-  const double theta46H = 0.211626808766; // acot(d5/a4);
-
-const std::array<double, 7> q_min = is_fr3 ? q_min_fr3 : q_min_panda;
-const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
-
-  if (q7 <= q_min[6] || q7 >= q_max[6])
-    return q_all_NAN;
-  else
-    for (int i = 0; i < 4; i++)
-      q_all(i, 6) = q7;
+  if (q7 <= q_min[6] || q7 >= q_max[6]) return q_all_NAN;
+  for (int i = 0; i < 4; i++) q_all(i, 6) = q7;
 
   // compute p_6
   Eigen::Matrix3d R_EE = O_T_EE.topLeftCorner<3, 3>();
   Eigen::Vector3d z_EE = O_T_EE.block<3, 1>(0, 2);
   Eigen::Vector3d p_EE = O_T_EE.block<3, 1>(0, 3);
-  Eigen::Vector3d p_7 = p_EE - d7e * z_EE;
+  
+  // Use constant d7e
+  Eigen::Vector3d p_7 = p_EE - d7e * z_EE; 
 
   Eigen::Vector3d x_EE_6;
   x_EE_6 << std::cos(q7 - M_PI_4), -std::sin(q7 - M_PI_4), 0.0;
   Eigen::Vector3d x_6 = R_EE * x_EE_6;
-  x_6 /= x_6.norm(); // visibly increases accuracy
+  x_6 /= x_6.norm(); 
+  
+  // Use constant a7
   Eigen::Vector3d p_6 = p_7 - a7 * x_6;
 
   // compute q4
   Eigen::Vector3d p_2;
-  p_2 << 0.0, 0.0, d1;
+  p_2 << 0.0, 0.0, d1; // Use constant d1
   Eigen::Vector3d V26 = p_6 - p_2;
 
-  double LL26 = V26[0] * V26[0] + V26[1] * V26[1] + V26[2] * V26[2];
+  double LL26 = V26.squaredNorm();
   double L26 = std::sqrt(LL26);
 
   if (L24 + L46 < L26 || L24 + L26 < L46 || L26 + L46 < L24)
@@ -87,9 +88,7 @@ const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
   double q4 = theta246 + thetaH46 + theta342 - 2.0 * M_PI;
   if (q4 <= q_min[3] || q4 >= q_max[3])
     return q_all_NAN;
-  else
-    for (int i = 0; i < 4; i++)
-      q_all(i, 3) = q4;
+  for (int i = 0; i < 4; i++) q_all(i, 3) = q4;
 
   // compute q6
   double theta462 = std::acos((LL26 + LL46 - LL24) / 2.0 / L26 / L46);
@@ -105,18 +104,15 @@ const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
   Eigen::Vector3d V_6_62 = R_6.transpose() * (-V26);
 
   double Phi6 = std::atan2(V_6_62[1], V_6_62[0]);
-  double Theta6 =
-      std::asin(D26 / std::sqrt(V_6_62[0] * V_6_62[0] + V_6_62[1] * V_6_62[1]));
+  double Theta6 = std::asin(D26 / std::hypot(V_6_62[0], V_6_62[1]));
 
   std::array<double, 2> q6;
   q6[0] = M_PI - Theta6 - Phi6;
   q6[1] = Theta6 - Phi6;
 
   for (int i = 0; i < 2; i++) {
-    if (q6[i] <= q_min[5])
-      q6[i] += 2.0 * M_PI;
-    else if (q6[i] >= q_max[5])
-      q6[i] -= 2.0 * M_PI;
+    if (q6[i] <= q_min[5]) q6[i] += 2.0 * M_PI;
+    else if (q6[i] >= q_max[5]) q6[i] -= 2.0 * M_PI;
 
     if (q6[i] <= q_min[5] || q6[i] >= q_max[5]) {
       q_all.row(2 * i) = q_NAN;
@@ -126,8 +122,7 @@ const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
       q_all(2 * i + 1, 5) = q6[i];
     }
   }
-  if (std::isnan(q_all(0, 5)) && std::isnan(q_all(2, 5)))
-    return q_all_NAN;
+  if (std::isnan(q_all(0, 5)) && std::isnan(q_all(2, 5))) return q_all_NAN;
 
   // compute q1 & q2
   double thetaP26 = 3.0 * M_PI_2 - theta462 - theta246 - theta342;
@@ -150,7 +145,7 @@ const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
 
     double L2P = V2P.norm();
 
-    if (std::fabs(V2P[2] / L2P) > 0.999) {
+    if (std::fabs(V2P[2] / L2P) > 0.99999) {
       q_all(2 * i, 0) = q_actual_array[0];
       q_all(2 * i, 1) = 0.0;
       q_all(2 * i + 1, 0) = q_actual_array[0];
@@ -178,15 +173,18 @@ const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
     Eigen::Vector3d Y_3 = -V26.cross(V2P_all[i]);
     Eigen::Vector3d y_3 = Y_3 / Y_3.norm();
     Eigen::Vector3d x_3 = y_3.cross(z_3);
-    Eigen::Matrix3d R_1;
+    
+    // Explicit Rotation Matrix Construction
     double c1 = std::cos(q_all(i, 0));
     double s1 = std::sin(q_all(i, 0));
-    R_1 << c1, -s1, 0.0, s1, c1, 0.0, 0.0, 0.0, 1.0;
-    Eigen::Matrix3d R_1_2;
     double c2 = std::cos(q_all(i, 1));
     double s2 = std::sin(q_all(i, 1));
-    R_1_2 << c2, -s2, 0.0, 0.0, 0.0, 1.0, -s2, -c2, 0.0;
-    Eigen::Matrix3d R_2 = R_1 * R_1_2;
+    
+    Eigen::Matrix3d R_2;
+    R_2 << c1*c2, -c1*s2, -s1,
+           s1*c2, -s1*s2,  c1,
+           -s2,   -c2,     0;
+
     Eigen::Vector3d x_2_3 = R_2.transpose() * x_3;
     q_all(i, 2) = std::atan2(x_2_3[2], x_2_3[0]);
 
@@ -196,11 +194,16 @@ const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
     }
 
     // compute q5
+    // Use constants d3, a4, d5
     Eigen::Vector3d VH4 = p_2 + d3 * z_3 + a4 * x_3 - p_6 + d5 * z_5_all[i];
-    Eigen::Matrix3d R_5_6;
+    
     double c6 = std::cos(q_all(i, 5));
     double s6 = std::sin(q_all(i, 5));
-    R_5_6 << c6, -s6, 0.0, 0.0, 0.0, -1.0, s6, c6, 0.0;
+    Eigen::Matrix3d R_5_6;
+    R_5_6 << c6, -s6, 0.0, 
+             0.0, 0.0, -1.0, 
+             s6,  c6, 0.0;
+             
     Eigen::Matrix3d R_5 = R_6 * R_5_6.transpose();
     Eigen::Vector3d V_5_H4 = R_5.transpose() * VH4;
 
@@ -214,29 +217,13 @@ const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
   return q_all;
 }
 
+
 Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
-                           Vector7d q_actual_array = frankik::kQDefault,
-                           double q7 = M_PI_4, bool is_fr3 = false) {
+            Vector7d q_actual_array = frankik::kQDefault,
+            double q7 = M_PI_4, bool is_fr3 = false) {
   const Vector7d q_NAN =
       Vector7d::Constant(std::numeric_limits<double>::quiet_NaN());
   Vector7d q;
-
-  // constants
-  const double d1 = 0.3330;
-  const double d3 = 0.3160;
-  const double d5 = 0.3840;
-  const double d7e = 0.2104;
-  const double a4 = 0.0825;
-  const double a7 = 0.0880;
-
-  const double LL24 = 0.10666225;    // a4^2 + d3^2
-  const double LL46 = 0.15426225;    // a4^2 + d5^2
-  const double L24 = 0.326591870689; // sqrt(LL24)
-  const double L46 = 0.392762332715; // sqrt(LL46)
-
-  const double thetaH46 = 1.35916951803;  // atan(d5/a4);
-  const double theta342 = 1.31542071191;  // atan(d3/a4);
-  const double theta46H = 0.211626808766; // acot(d5/a4);
 
   const std::array<double, 7> q_min = is_fr3 ? q_min_fr3 : q_min_panda;
   const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
@@ -294,12 +281,14 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   Eigen::Matrix3d R_EE = O_T_EE.topLeftCorner<3, 3>();
   Eigen::Vector3d z_EE = O_T_EE.block<3, 1>(0, 2);
   Eigen::Vector3d p_EE = O_T_EE.block<3, 1>(0, 3);
+  
   Eigen::Vector3d p_7 = p_EE - d7e * z_EE;
 
   Eigen::Vector3d x_EE_6;
   x_EE_6 << std::cos(q7 - M_PI_4), -std::sin(q7 - M_PI_4), 0.0;
   Eigen::Vector3d x_6 = R_EE * x_EE_6;
   x_6 /= x_6.norm(); // visibly increases accuracy
+  
   Eigen::Vector3d p_6 = p_7 - a7 * x_6;
 
   // IK: compute q4
@@ -307,7 +296,7 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   p_2 << 0.0, 0.0, d1;
   Eigen::Vector3d V26 = p_6 - p_2;
 
-  double LL26 = V26[0] * V26[0] + V26[1] * V26[1] + V26[2] * V26[2];
+  double LL26 = V26.squaredNorm(); // Optimized to squaredNorm()
   double L26 = std::sqrt(LL26);
 
   if (L24 + L46 < L26 || L24 + L26 < L46 || L26 + L46 < L24)
@@ -360,7 +349,7 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
 
   double L2P = V2P.norm();
 
-  if (std::fabs(V2P[2] / L2P) > 0.999) {
+  if (std::fabs(V2P[2] / L2P) > 0.99999) {
     q[0] = q_actual_array[0];
     q[1] = 0.0;
   } else {
@@ -418,309 +407,167 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
 Eigen::Matrix<double, 4, 4> fk(const Eigen::Matrix<double, 7, 1> &q) {
   Eigen::Matrix<double, 4, 4> pose;
   pose.setZero();
+  
+  // Aliases for brevity and safety
+  double sin_q6_pi4 = std::sin(q[6] + M_PI_4);
+  double cos_q6_pi4 = std::cos(q[6] + M_PI_4);
+
+  // ROW 0
   pose.row(0)(0) =
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[3]) * std::sin(q[5]) *
-          std::sin(q[6] + M_PI_4) +
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[3]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) -
-      1.0 * std::sin(q[0]) * std::sin(q[4]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[2]) * std::cos(q[5]) -
-      1.0 * std::sin(q[0]) * std::cos(q[2]) * std::cos(q[4]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[4]) * std::cos(q[0]) *
-          std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[0]) * std::cos(q[4]) * std::cos(q[5]) +
-      1.0 * std::sin(q[1]) * std::sin(q[5]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[0]) * std::cos(q[3]) -
-      1.0 * std::sin(q[2]) * std::sin(q[4]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[0]) * std::cos(q[1]) * std::cos(q[5]) -
-      1.0 * std::sin(q[2]) * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[4]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[3]) * std::sin(q[5]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]) -
-      1.0 * std::sin(q[4]) * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]) *
-          std::cos(q[3]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[6] + M_PI_4) * std::cos(q[0]) * std::cos(q[1]) *
-          std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]);
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[3]) * std::sin(q[5]) * sin_q6_pi4 +
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[3]) * cos_q6_pi4 -
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * sin_q6_pi4 * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) -
+      1.0 * std::sin(q[0]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[2]) * std::cos(q[5]) -
+      1.0 * std::sin(q[0]) * std::cos(q[2]) * std::cos(q[4]) * cos_q6_pi4 -
+      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[4]) * std::cos(q[0]) * cos_q6_pi4 +
+      1.0 * std::sin(q[1]) * std::sin(q[3]) * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[4]) * std::cos(q[5]) +
+      1.0 * std::sin(q[1]) * std::sin(q[5]) * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[3]) -
+      1.0 * std::sin(q[2]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[5]) -
+      1.0 * std::sin(q[2]) * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[4]) * cos_q6_pi4 -
+      1.0 * std::sin(q[3]) * std::sin(q[5]) * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]) -
+      1.0 * std::sin(q[4]) * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) * cos_q6_pi4 +
+      1.0 * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]);
+      
   pose.row(0)(1) =
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[3]) * std::sin(q[5]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[4]) *
-          std::sin(q[6] + M_PI_4) * std::cos(q[3]) -
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::cos(q[3]) * std::cos(q[4]) *
-          std::cos(q[5]) * std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[0]) * std::sin(q[4]) * std::cos(q[2]) * std::cos(q[5]) *
-          std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[0]) * std::sin(q[6] + M_PI_4) * std::cos(q[2]) *
-          std::cos(q[4]) +
-      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[4]) *
-          std::sin(q[6] + M_PI_4) * std::cos(q[0]) +
-      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0]) * std::cos(q[4]) *
-          std::cos(q[5]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[1]) * std::sin(q[5]) * std::cos(q[0]) * std::cos(q[3]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[0]) * std::cos(q[1]) *
-          std::cos(q[5]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[2]) * std::sin(q[6] + M_PI_4) * std::cos(q[0]) *
-          std::cos(q[1]) * std::cos(q[4]) -
-      1.0 * std::sin(q[3]) * std::sin(q[5]) * std::cos(q[0]) * std::cos(q[1]) *
-          std::cos(q[2]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[4]) * std::sin(q[6] + M_PI_4) * std::cos(q[0]) *
-          std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) +
-      1.0 * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) *
-          std::cos(q[4]) * std::cos(q[5]) * std::cos(q[6] + M_PI_4);
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[3]) * std::sin(q[5]) * cos_q6_pi4 -
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[3]) -
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) * cos_q6_pi4 -
+      1.0 * std::sin(q[0]) * std::sin(q[4]) * std::cos(q[2]) * std::cos(q[5]) * cos_q6_pi4 +
+      1.0 * std::sin(q[0]) * sin_q6_pi4 * std::cos(q[2]) * std::cos(q[4]) +
+      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[0]) +
+      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0]) * std::cos(q[4]) * std::cos(q[5]) * cos_q6_pi4 +
+      1.0 * std::sin(q[1]) * std::sin(q[5]) * std::cos(q[0]) * std::cos(q[3]) * cos_q6_pi4 -
+      1.0 * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[5]) * cos_q6_pi4 +
+      1.0 * std::sin(q[2]) * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[4]) -
+      1.0 * std::sin(q[3]) * std::sin(q[5]) * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]) * cos_q6_pi4 +
+      1.0 * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) +
+      1.0 * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) * cos_q6_pi4;
+      
   pose.row(0)(2) = -1.0 *
-                       (((std::sin(q[0]) * std::sin(q[2]) -
-                          std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) *
-                             std::cos(q[3]) -
-                         std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0])) *
-                            std::cos(q[4]) +
-                        (std::sin(q[0]) * std::cos(q[2]) +
-                         std::sin(q[2]) * std::cos(q[0]) * std::cos(q[1])) *
-                            std::sin(q[4])) *
-                       std::sin(q[5]) -
-                   1.0 *
-                       ((std::sin(q[0]) * std::sin(q[2]) -
-                         std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) *
-                            std::sin(q[3]) +
-                        std::sin(q[1]) * std::cos(q[0]) * std::cos(q[3])) *
-                       std::cos(q[5]);
+      (((std::sin(q[0]) * std::sin(q[2]) - std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) * std::cos(q[3]) -
+        std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0])) * std::cos(q[4]) +
+       (std::sin(q[0]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0]) * std::cos(q[1])) * std::sin(q[4])) * std::sin(q[5]) -
+      1.0 *
+      ((std::sin(q[0]) * std::sin(q[2]) - std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) * std::sin(q[3]) +
+       std::sin(q[1]) * std::cos(q[0]) * std::cos(q[3])) * std::cos(q[5]);
+       
   pose.row(0)(3) =
-      -0.21000000000000002 *
-          (((std::sin(q[0]) * std::sin(q[2]) -
-             std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) *
-                std::cos(q[3]) -
-            std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0])) *
-               std::cos(q[4]) +
-           (std::sin(q[0]) * std::cos(q[2]) +
-            std::sin(q[2]) * std::cos(q[0]) * std::cos(q[1])) *
-               std::sin(q[4])) *
-          std::sin(q[5]) -
-      0.087999999999999995 *
-          (((std::sin(q[0]) * std::sin(q[2]) -
-             std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) *
-                std::cos(q[3]) -
-            std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0])) *
-               std::cos(q[4]) +
-           (std::sin(q[0]) * std::cos(q[2]) +
-            std::sin(q[2]) * std::cos(q[0]) * std::cos(q[1])) *
-               std::sin(q[4])) *
-          std::cos(q[5]) +
-      0.087999999999999995 *
-          ((std::sin(q[0]) * std::sin(q[2]) -
-            std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) *
-               std::sin(q[3]) +
-           std::sin(q[1]) * std::cos(q[0]) * std::cos(q[3])) *
-          std::sin(q[5]) -
-      0.21000000000000002 *
-          ((std::sin(q[0]) * std::sin(q[2]) -
-            std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) *
-               std::sin(q[3]) +
-           std::sin(q[1]) * std::cos(q[0]) * std::cos(q[3])) *
-          std::cos(q[5]) +
-      0.38400000000000001 *
-          (std::sin(q[0]) * std::sin(q[2]) -
-           std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) *
-          std::sin(q[3]) +
-      0.082500000000000004 *
-          (std::sin(q[0]) * std::sin(q[2]) -
-           std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) *
-          std::cos(q[3]) -
-      0.082500000000000004 * std::sin(q[0]) * std::sin(q[2]) -
-      0.082500000000000004 * std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0]) +
-      0.38400000000000001 * std::sin(q[1]) * std::cos(q[0]) * std::cos(q[3]) +
-      0.316 * std::sin(q[1]) * std::cos(q[0]) +
-      0.082500000000000004 * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]);
+      -d7e * (((std::sin(q[0]) * std::sin(q[2]) - std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) * std::cos(q[3]) -
+               std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0])) * std::cos(q[4]) +
+              (std::sin(q[0]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0]) * std::cos(q[1])) * std::sin(q[4])) * std::sin(q[5]) -
+      a7 * (((std::sin(q[0]) * std::sin(q[2]) - std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) * std::cos(q[3]) -
+             std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0])) * std::cos(q[4]) +
+            (std::sin(q[0]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0]) * std::cos(q[1])) * std::sin(q[4])) * std::cos(q[5]) +
+      a7 * ((std::sin(q[0]) * std::sin(q[2]) - std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) * std::sin(q[3]) +
+            std::sin(q[1]) * std::cos(q[0]) * std::cos(q[3])) * std::sin(q[5]) -
+      d7e * ((std::sin(q[0]) * std::sin(q[2]) - std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) * std::sin(q[3]) +
+             std::sin(q[1]) * std::cos(q[0]) * std::cos(q[3])) * std::cos(q[5]) +
+      d5 * (std::sin(q[0]) * std::sin(q[2]) - std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) * std::sin(q[3]) +
+      a4 * (std::sin(q[0]) * std::sin(q[2]) - std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2])) * std::cos(q[3]) -
+      a4 * std::sin(q[0]) * std::sin(q[2]) -
+      a4 * std::sin(q[1]) * std::sin(q[3]) * std::cos(q[0]) +
+      d5 * std::sin(q[1]) * std::cos(q[0]) * std::cos(q[3]) +
+      d3 * std::sin(q[1]) * std::cos(q[0]) +
+      a4 * std::cos(q[0]) * std::cos(q[1]) * std::cos(q[2]);
+      
+  // ROW 1
   pose.row(1)(0) =
-      -1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[4]) *
-          std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) *
-          std::sin(q[6] + M_PI_4) * std::cos(q[4]) * std::cos(q[5]) +
-      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[5]) *
-          std::sin(q[6] + M_PI_4) * std::cos(q[3]) -
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[4]) *
-          std::sin(q[6] + M_PI_4) * std::cos(q[1]) * std::cos(q[5]) -
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::cos(q[1]) * std::cos(q[4]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[0]) * std::sin(q[3]) * std::sin(q[5]) *
-          std::sin(q[6] + M_PI_4) * std::cos(q[1]) * std::cos(q[2]) -
-      1.0 * std::sin(q[0]) * std::sin(q[4]) * std::cos(q[1]) * std::cos(q[2]) *
-          std::cos(q[3]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[0]) * std::sin(q[6] + M_PI_4) * std::cos(q[1]) *
-          std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) -
-      1.0 * std::sin(q[2]) * std::sin(q[3]) * std::sin(q[5]) *
-          std::sin(q[6] + M_PI_4) * std::cos(q[0]) -
-      1.0 * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[0]) * std::cos(q[3]) *
-          std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[2]) * std::sin(q[6] + M_PI_4) * std::cos(q[0]) *
-          std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) +
-      1.0 * std::sin(q[4]) * std::sin(q[6] + M_PI_4) * std::cos(q[0]) *
-          std::cos(q[2]) * std::cos(q[5]) +
-      1.0 * std::cos(q[0]) * std::cos(q[2]) * std::cos(q[4]) *
-          std::cos(q[6] + M_PI_4);
+      -1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[4]) * cos_q6_pi4 +
+      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) * sin_q6_pi4 * std::cos(q[4]) * std::cos(q[5]) +
+      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[5]) * sin_q6_pi4 * std::cos(q[3]) -
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[1]) * std::cos(q[5]) -
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::cos(q[1]) * std::cos(q[4]) * cos_q6_pi4 -
+      1.0 * std::sin(q[0]) * std::sin(q[3]) * std::sin(q[5]) * sin_q6_pi4 * std::cos(q[1]) * std::cos(q[2]) -
+      1.0 * std::sin(q[0]) * std::sin(q[4]) * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) * cos_q6_pi4 +
+      1.0 * std::sin(q[0]) * sin_q6_pi4 * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) -
+      1.0 * std::sin(q[2]) * std::sin(q[3]) * std::sin(q[5]) * sin_q6_pi4 * std::cos(q[0]) -
+      1.0 * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[0]) * std::cos(q[3]) * cos_q6_pi4 +
+      1.0 * std::sin(q[2]) * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) +
+      1.0 * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[2]) * std::cos(q[5]) +
+      1.0 * std::cos(q[0]) * std::cos(q[2]) * std::cos(q[4]) * cos_q6_pi4;
+      
   pose.row(1)(1) =
-      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[4]) *
-          std::sin(q[6] + M_PI_4) +
-      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) * std::cos(q[4]) *
-          std::cos(q[5]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[5]) * std::cos(q[3]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[1]) *
-          std::cos(q[5]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[1]) * std::cos(q[4]) -
-      1.0 * std::sin(q[0]) * std::sin(q[3]) * std::sin(q[5]) * std::cos(q[1]) *
-          std::cos(q[2]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[0]) * std::sin(q[4]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) +
-      1.0 * std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) *
-          std::cos(q[4]) * std::cos(q[5]) * std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[2]) * std::sin(q[3]) * std::sin(q[5]) * std::cos(q[0]) *
-          std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[2]) * std::sin(q[4]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[0]) * std::cos(q[3]) +
-      1.0 * std::sin(q[2]) * std::cos(q[0]) * std::cos(q[3]) * std::cos(q[4]) *
-          std::cos(q[5]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[4]) * std::cos(q[0]) * std::cos(q[2]) * std::cos(q[5]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[6] + M_PI_4) * std::cos(q[0]) * std::cos(q[2]) *
-          std::cos(q[4]);
+      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[4]) * sin_q6_pi4 +
+      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) * std::cos(q[4]) * std::cos(q[5]) * cos_q6_pi4 +
+      1.0 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[5]) * std::cos(q[3]) * cos_q6_pi4 -
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[1]) * std::cos(q[5]) * cos_q6_pi4 +
+      1.0 * std::sin(q[0]) * std::sin(q[2]) * sin_q6_pi4 * std::cos(q[1]) * std::cos(q[4]) -
+      1.0 * std::sin(q[0]) * std::sin(q[3]) * std::sin(q[5]) * std::cos(q[1]) * std::cos(q[2]) * cos_q6_pi4 +
+      1.0 * std::sin(q[0]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) +
+      1.0 * std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) * cos_q6_pi4 -
+      1.0 * std::sin(q[2]) * std::sin(q[3]) * std::sin(q[5]) * std::cos(q[0]) * cos_q6_pi4 +
+      1.0 * std::sin(q[2]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[3]) +
+      1.0 * std::sin(q[2]) * std::cos(q[0]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) * cos_q6_pi4 +
+      1.0 * std::sin(q[4]) * std::cos(q[0]) * std::cos(q[2]) * std::cos(q[5]) * cos_q6_pi4 -
+      1.0 * sin_q6_pi4 * std::cos(q[0]) * std::cos(q[2]) * std::cos(q[4]);
+      
   pose.row(1)(2) = 1.0 *
-                       (((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
-                          std::sin(q[2]) * std::cos(q[0])) *
-                             std::cos(q[3]) +
-                         std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3])) *
-                            std::cos(q[4]) -
-                        (std::sin(q[0]) * std::sin(q[2]) * std::cos(q[1]) -
-                         std::cos(q[0]) * std::cos(q[2])) *
-                            std::sin(q[4])) *
-                       std::sin(q[5]) +
-                   1.0 *
-                       ((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
-                         std::sin(q[2]) * std::cos(q[0])) *
-                            std::sin(q[3]) -
-                        std::sin(q[0]) * std::sin(q[1]) * std::cos(q[3])) *
-                       std::cos(q[5]);
+      (((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0])) * std::cos(q[3]) +
+        std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3])) * std::cos(q[4]) -
+       (std::sin(q[0]) * std::sin(q[2]) * std::cos(q[1]) - std::cos(q[0]) * std::cos(q[2])) * std::sin(q[4])) * std::sin(q[5]) +
+      1.0 *
+      ((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0])) * std::sin(q[3]) -
+       std::sin(q[0]) * std::sin(q[1]) * std::cos(q[3])) * std::cos(q[5]);
+  
   pose.row(1)(3) =
-      0.21000000000000002 *
-          (((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
-             std::sin(q[2]) * std::cos(q[0])) *
-                std::cos(q[3]) +
-            std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3])) *
-               std::cos(q[4]) -
-           (std::sin(q[0]) * std::sin(q[2]) * std::cos(q[1]) -
-            std::cos(q[0]) * std::cos(q[2])) *
-               std::sin(q[4])) *
-          std::sin(q[5]) +
-      0.087999999999999995 *
-          (((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
-             std::sin(q[2]) * std::cos(q[0])) *
-                std::cos(q[3]) +
-            std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3])) *
-               std::cos(q[4]) -
-           (std::sin(q[0]) * std::sin(q[2]) * std::cos(q[1]) -
-            std::cos(q[0]) * std::cos(q[2])) *
-               std::sin(q[4])) *
-          std::cos(q[5]) -
-      0.087999999999999995 *
-          ((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
-            std::sin(q[2]) * std::cos(q[0])) *
-               std::sin(q[3]) -
-           std::sin(q[0]) * std::sin(q[1]) * std::cos(q[3])) *
-          std::sin(q[5]) +
-      0.21000000000000002 *
-          ((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
-            std::sin(q[2]) * std::cos(q[0])) *
-               std::sin(q[3]) -
-           std::sin(q[0]) * std::sin(q[1]) * std::cos(q[3])) *
-          std::cos(q[5]) -
-      0.38400000000000001 *
-          (std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
-           std::sin(q[2]) * std::cos(q[0])) *
-          std::sin(q[3]) -
-      0.082500000000000004 *
-          (std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
-           std::sin(q[2]) * std::cos(q[0])) *
-          std::cos(q[3]) -
-      0.082500000000000004 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) +
-      0.38400000000000001 * std::sin(q[0]) * std::sin(q[1]) * std::cos(q[3]) +
-      0.316 * std::sin(q[0]) * std::sin(q[1]) +
-      0.082500000000000004 * std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
-      0.082500000000000004 * std::sin(q[2]) * std::cos(q[0]);
-  pose.row(2)(0) = 1.0 * std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4]) *
-                       std::sin(q[6] + M_PI_4) * std::cos(q[5]) +
-                   1.0 * std::sin(q[1]) * std::sin(q[2]) * std::cos(q[4]) *
-                       std::cos(q[6] + M_PI_4) +
-                   1.0 * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[5]) *
-                       std::sin(q[6] + M_PI_4) * std::cos(q[2]) +
-                   1.0 * std::sin(q[1]) * std::sin(q[4]) * std::cos(q[2]) *
-                       std::cos(q[3]) * std::cos(q[6] + M_PI_4) -
-                   1.0 * std::sin(q[1]) * std::sin(q[6] + M_PI_4) *
-                       std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) *
-                       std::cos(q[5]) -
-                   1.0 * std::sin(q[3]) * std::sin(q[4]) * std::cos(q[1]) *
-                       std::cos(q[6] + M_PI_4) +
-                   1.0 * std::sin(q[3]) * std::sin(q[6] + M_PI_4) *
-                       std::cos(q[1]) * std::cos(q[4]) * std::cos(q[5]) +
-                   1.0 * std::sin(q[5]) * std::sin(q[6] + M_PI_4) *
-                       std::cos(q[1]) * std::cos(q[3]);
+      d7e * (((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0])) * std::cos(q[3]) +
+              std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3])) * std::cos(q[4]) -
+             (std::sin(q[0]) * std::sin(q[2]) * std::cos(q[1]) - std::cos(q[0]) * std::cos(q[2])) * std::sin(q[4])) * std::sin(q[5]) +
+      a7 * (((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0])) * std::cos(q[3]) +
+             std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3])) * std::cos(q[4]) -
+            (std::sin(q[0]) * std::sin(q[2]) * std::cos(q[1]) - std::cos(q[0]) * std::cos(q[2])) * std::sin(q[4])) * std::cos(q[5]) -
+      a7 * ((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0])) * std::sin(q[3]) -
+            std::sin(q[0]) * std::sin(q[1]) * std::cos(q[3])) * std::sin(q[5]) +
+      d7e * ((std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0])) * std::sin(q[3]) -
+             std::sin(q[0]) * std::sin(q[1]) * std::cos(q[3])) * std::cos(q[5]) -
+      d5 * (std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0])) * std::sin(q[3]) -
+      a4 * (std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) + std::sin(q[2]) * std::cos(q[0])) * std::cos(q[3]) -
+      a4 * std::sin(q[0]) * std::sin(q[1]) * std::sin(q[3]) +
+      d5 * std::sin(q[0]) * std::sin(q[1]) * std::cos(q[3]) +
+      d3 * std::sin(q[0]) * std::sin(q[1]) +
+      a4 * std::sin(q[0]) * std::cos(q[1]) * std::cos(q[2]) +
+      a4 * std::sin(q[2]) * std::cos(q[0]);
+
+  // ROW 2
+  pose.row(2)(0) = 1.0 * std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[5]) +
+      1.0 * std::sin(q[1]) * std::sin(q[2]) * std::cos(q[4]) * cos_q6_pi4 +
+      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[5]) * sin_q6_pi4 * std::cos(q[2]) +
+      1.0 * std::sin(q[1]) * std::sin(q[4]) * std::cos(q[2]) * std::cos(q[3]) * cos_q6_pi4 -
+      1.0 * std::sin(q[1]) * sin_q6_pi4 * std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) -
+      1.0 * std::sin(q[3]) * std::sin(q[4]) * std::cos(q[1]) * cos_q6_pi4 +
+      1.0 * std::sin(q[3]) * sin_q6_pi4 * std::cos(q[1]) * std::cos(q[4]) * std::cos(q[5]) +
+      1.0 * std::sin(q[5]) * sin_q6_pi4 * std::cos(q[1]) * std::cos(q[3]);
+      
   pose.row(2)(1) =
-      1.0 * std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[5]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[1]) * std::sin(q[2]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[4]) +
-      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[5]) * std::cos(q[2]) *
-          std::cos(q[6] + M_PI_4) -
-      1.0 * std::sin(q[1]) * std::sin(q[4]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[2]) * std::cos(q[3]) -
-      1.0 * std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) *
-          std::cos(q[5]) * std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[3]) * std::sin(q[4]) * std::sin(q[6] + M_PI_4) *
-          std::cos(q[1]) +
-      1.0 * std::sin(q[3]) * std::cos(q[1]) * std::cos(q[4]) * std::cos(q[5]) *
-          std::cos(q[6] + M_PI_4) +
-      1.0 * std::sin(q[5]) * std::cos(q[1]) * std::cos(q[3]) *
-          std::cos(q[6] + M_PI_4);
+      1.0 * std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4]) * std::cos(q[5]) * cos_q6_pi4 -
+      1.0 * std::sin(q[1]) * std::sin(q[2]) * sin_q6_pi4 * std::cos(q[4]) +
+      1.0 * std::sin(q[1]) * std::sin(q[3]) * std::sin(q[5]) * std::cos(q[2]) * cos_q6_pi4 -
+      1.0 * std::sin(q[1]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[2]) * std::cos(q[3]) -
+      1.0 * std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) * std::cos(q[4]) * std::cos(q[5]) * cos_q6_pi4 +
+      1.0 * std::sin(q[3]) * std::sin(q[4]) * sin_q6_pi4 * std::cos(q[1]) +
+      1.0 * std::sin(q[3]) * std::cos(q[1]) * std::cos(q[4]) * std::cos(q[5]) * cos_q6_pi4 +
+      1.0 * std::sin(q[5]) * std::cos(q[1]) * std::cos(q[3]) * cos_q6_pi4;
+      
   pose.row(2)(2) = -1.0 *
-                       ((std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) -
-                         std::sin(q[3]) * std::cos(q[1])) *
-                            std::cos(q[4]) -
-                        std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4])) *
-                       std::sin(q[5]) -
-                   1.0 *
-                       (std::sin(q[1]) * std::sin(q[3]) * std::cos(q[2]) +
-                        std::cos(q[1]) * std::cos(q[3])) *
-                       std::cos(q[5]);
+      ((std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) - std::sin(q[3]) * std::cos(q[1])) * std::cos(q[4]) -
+       std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4])) * std::sin(q[5]) -
+      1.0 * (std::sin(q[1]) * std::sin(q[3]) * std::cos(q[2]) + std::cos(q[1]) * std::cos(q[3])) * std::cos(q[5]);
+      
   pose.row(2)(3) =
-      -0.21000000000000002 *
-          ((std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) -
-            std::sin(q[3]) * std::cos(q[1])) *
-               std::cos(q[4]) -
-           std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4])) *
-          std::sin(q[5]) -
-      0.087999999999999995 *
-          ((std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) -
-            std::sin(q[3]) * std::cos(q[1])) *
-               std::cos(q[4]) -
-           std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4])) *
-          std::cos(q[5]) +
-      0.087999999999999995 *
-          (std::sin(q[1]) * std::sin(q[3]) * std::cos(q[2]) +
-           std::cos(q[1]) * std::cos(q[3])) *
-          std::sin(q[5]) -
-      0.21000000000000002 *
-          (std::sin(q[1]) * std::sin(q[3]) * std::cos(q[2]) +
-           std::cos(q[1]) * std::cos(q[3])) *
-          std::cos(q[5]) +
-      0.38400000000000001 * std::sin(q[1]) * std::sin(q[3]) * std::cos(q[2]) +
-      0.082500000000000004 * std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) -
-      0.082500000000000004 * std::sin(q[1]) * std::cos(q[2]) -
-      0.082500000000000004 * std::sin(q[3]) * std::cos(q[1]) +
-      0.38400000000000001 * std::cos(q[1]) * std::cos(q[3]) +
-      0.316 * std::cos(q[1]) + 0.33300000000000002;
+      -d7e * ((std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) - std::sin(q[3]) * std::cos(q[1])) * std::cos(q[4]) -
+              std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4])) * std::sin(q[5]) -
+      a7 * ((std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) - std::sin(q[3]) * std::cos(q[1])) * std::cos(q[4]) -
+            std::sin(q[1]) * std::sin(q[2]) * std::sin(q[4])) * std::cos(q[5]) +
+      a7 * (std::sin(q[1]) * std::sin(q[3]) * std::cos(q[2]) + std::cos(q[1]) * std::cos(q[3])) * std::sin(q[5]) -
+      d7e * (std::sin(q[1]) * std::sin(q[3]) * std::cos(q[2]) + std::cos(q[1]) * std::cos(q[3])) * std::cos(q[5]) +
+      d5 * std::sin(q[1]) * std::sin(q[3]) * std::cos(q[2]) +
+      a4 * std::sin(q[1]) * std::cos(q[2]) * std::cos(q[3]) -
+      a4 * std::sin(q[1]) * std::cos(q[2]) -
+      a4 * std::sin(q[3]) * std::cos(q[1]) +
+      d5 * std::cos(q[1]) * std::cos(q[3]) +
+      d3 * std::cos(q[1]) + 
+      d1;
+
   pose.row(3)(3) = 1.0;
   return pose;
 }
