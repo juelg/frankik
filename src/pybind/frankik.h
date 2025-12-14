@@ -41,10 +41,11 @@ const Vector7d kQDefault =
     (Vector7d() << 0.0, -M_PI_4, 0.0, -3 * M_PI_4, 0.0, M_PI_2, M_PI_4)
         .finished();
 
-Eigen::Matrix<double, 4, 7> ik_full(Eigen::Matrix<double, 4, 4> O_T_EE,
-                                    Vector7d q_actual_array = kQDefault,
-                                    double q7 = M_PI_4, bool is_fr3 = false) {
-
+Eigen::Matrix<double, 4, 7>
+ik_full(Eigen::Matrix<double, 4, 4> O_T_EE,
+        std::optional<Vector7d> q_actual = std::nullopt, double q7 = M_PI_4,
+        bool is_fr3 = false) {
+  Vector7d q_actual_array = q_actual.value_or(kQDefault);
   const Eigen::Matrix<double, 4, 7> q_all_NAN =
       Eigen::Matrix<double, 4, 7>::Constant(
           std::numeric_limits<double>::quiet_NaN());
@@ -221,8 +222,9 @@ Eigen::Matrix<double, 4, 7> ik_full(Eigen::Matrix<double, 4, 4> O_T_EE,
 }
 
 Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
-            Vector7d q_actual_array = frankik::kQDefault, double q7 = M_PI_4,
+            std::optional<Vector7d> q_actual = std::nullopt, double q7 = M_PI_4,
             bool is_fr3 = false) {
+  Vector7d q_actual_array = q_actual.value_or(kQDefault);
   const Vector7d q_NAN =
       Vector7d::Constant(std::numeric_limits<double>::quiet_NaN());
   Vector7d q;

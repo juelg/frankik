@@ -8,7 +8,7 @@ import typing
 
 import numpy
 
-__all__: list[str] = ["fk", "ik", "ik_full", "q_max_fr3", "q_max_panda", "q_min_fr3", "q_min_panda"]
+__all__: list[str] = ["fk", "ik", "ik_full", "kQDefault", "q_max_fr3", "q_max_panda", "q_min_fr3", "q_min_panda"]
 
 def fk(
     q: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]
@@ -25,7 +25,7 @@ def fk(
 
 def ik(
     O_T_EE: numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]],
-    q_actual_array: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]] = ...,
+    q_actual: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]] | None = None,
     q7: float = 0.7853981633974483,
     is_fr3: bool = False,
 ) -> numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]:
@@ -34,7 +34,7 @@ def ik(
 
     Args:
         O_T_EE (Eigen::Matrix<double, 4, 4>): Desired end-effector pose.
-        q_actual_array (Vector7d, optional): Current joint angles. Defaults to kQDefault.
+        q_actual (Vector7d, optional): Current joint angles. Defaults to kQDefault.
         q7 (double, optional): Joint 7 angle. Defaults to M_PI_4.
         is_fr3 (bool, optional): Whether to use FR3 joint limits. Defaults to false.
 
@@ -44,7 +44,7 @@ def ik(
 
 def ik_full(
     O_T_EE: numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]],
-    q_actual_array: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]] = ...,
+    q_actual: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]] | None = None,
     q7: float = 0.7853981633974483,
     is_fr3: bool = False,
 ) -> numpy.ndarray[tuple[typing.Literal[4], typing.Literal[7]], numpy.dtype[numpy.float64]]:
@@ -53,7 +53,7 @@ def ik_full(
 
     Args:
         O_T_EE (Eigen::Matrix<double, 4, 4>): Desired end-effector pose.
-        q_actual_array (Vector7d, optional): Current joint angles. Defaults to kQDefault.
+        q_actual (Vector7d, optional): Current joint angles. Defaults to kQDefault.
         q7 (double, optional): Joint 7 angle. Defaults to M_PI_4.
         is_fr3 (bool, optional): Whether to use FR3 joint limits. Defaults to false.
 
@@ -62,6 +62,7 @@ def ik_full(
     """
 
 __version__: str = "0.1"
+kQDefault: numpy.ndarray  # value = array([ 0.        , -0.78539816,  0.        , -2.35619449,  0.        ,...
 q_max_fr3: list = [2.3093, 1.5133, 2.4937, -0.4461, 2.48, 4.2094, 2.6895]
 q_max_panda: list = [2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973]
 q_min_fr3: list = [-2.3093, -1.5133, -2.4937, -2.7478, -2.48, 0.8521, -2.6895]
