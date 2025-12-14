@@ -75,6 +75,7 @@ class FrankaKinematics:
         q0: np.ndarray[tuple[typing.Literal[7]], np.dtype[np.float64]] | None = None,
         tcp_offset: np.ndarray[tuple[typing.Literal[4], typing.Literal[4]], np.dtype[np.float64]] | None = None,
         allow_elbow_flips: bool = False,
+        q7: float = np.pi / 4,
     ) -> np.ndarray[tuple[typing.Literal[7]], np.dtype[np.float64]] | None:
         """Compute the inverse kinematics for the given end-effector pose.
         Args:
@@ -87,13 +88,13 @@ class FrankaKinematics:
             np.ndarray | None: A 7-element array representing the joint angles if a solution is found; otherwise, None.
         """
         new_pose = pose @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose
-        q = ik(new_pose, q0, is_fr3=(self.robot_type == RobotType.FR3))
+        q = ik(new_pose, q0, q7=q7, is_fr3=(self.robot_type == RobotType.FR3))
 
         if not np.isnan(q).any():
             return q
         if not allow_elbow_flips:
             return None
-        qs = ik_full(new_pose, q0, is_fr3=(self.robot_type == RobotType.FR3))
+        qs = ik_full(new_pose, q0, q7=q7, is_fr3=(self.robot_type == RobotType.FR3))
         qs_list = list(qs)
         # drop nan solutions
         qs_list = [q for q in qs_list if not np.isnan(q).any()]
