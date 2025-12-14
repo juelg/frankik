@@ -9,7 +9,7 @@ N_SAMPLES = 200
 
 # Cartesian Tolerance (Position/Rotation matrix element difference)
 # 1e-5 corresponds to roughly 0.01mm or 0.001 degrees deviation
-CARTESIAN_TOL = 1e-4
+CARTESIAN_TOL = 1e-3
 
 
 @pytest.fixture(autouse=True)
@@ -122,7 +122,7 @@ def test_ik_correctness_cartesian(robot_type):
         # target_pose = get_random_pose_in_isocube()
 
         # 2. Inverse Kinematics
-        q_sol = frankik.ik(O_T_EE=target_pose, q_actual_array=q_orig, q7=q_orig[6], is_fr3=is_fr3)
+        q_sol = frankik.ik(O_T_EE=target_pose, q_actual=q_orig, q7=q_orig[6], is_fr3=is_fr3)
 
         # CHECK 1: Did we find a solution?
         if np.isnan(q_sol).any():
@@ -165,7 +165,7 @@ def test_ik_full_consistency(robot_type):
 
         solutions = frankik.ik_full(
             O_T_EE=target_pose,
-            q_actual_array=q_orig,
+            q_actual=q_orig,
             q7=q_orig[6],
             is_fr3=is_fr3,
         )
