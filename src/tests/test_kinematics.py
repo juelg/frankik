@@ -13,18 +13,18 @@ CARTESIAN_TOL = 1e-3
 
 
 @pytest.fixture(autouse=True)
-def set_seed():
+def _set_seed():
     """Automatically seed the RNG before every test to ensure reproducibility."""
     np.random.seed(42)
 
 
-def generate_random_q(q_min, q_max, n=1):
+def generate_random_q(q_min, q_max):
     q_min = np.array(q_min)
     q_max = np.array(q_max)
     range_span = q_max - q_min
 
     # 1. Generate base random values (centered 90% of range)
-    unit_rand = np.random.rand(n, 7)
+    unit_rand = np.random.rand(1, 7)
     q_rand = q_min + (range_span * 0.05) + unit_rand * (range_span * 0.90)
 
     # 2. Singularity Avoidance
@@ -35,33 +35,18 @@ def generate_random_q(q_min, q_max, n=1):
     # Threshold in radians (approx 5 degrees to be safe)
     singularity_threshold = 0.08
 
-    # Handle single sample case (1D array)
-    if n == 1:
-        # Avoid Shoulder Singularity (q[1] ≈ 0)
-        if abs(q_rand[0, 1]) < singularity_threshold:
-            # Push it away from 0, preserving the sign (default to positive if 0)
-            sign = np.sign(q_rand[0, 1]) if q_rand[0, 1] != 0 else 1.0
-            q_rand[0, 1] = sign * singularity_threshold
+    # Avoid Shoulder Singularity (q[1] ≈ 0)
+    if abs(q_rand[0, 1]) < singularity_threshold:
+        # Push it away from 0, preserving the sign (default to positive if 0)
+        sign = np.sign(q_rand[0, 1]) if q_rand[0, 1] != 0 else 1.0
+        q_rand[0, 1] = sign * singularity_threshold
 
-        # Avoid Wrist Singularity (q[5] ≈ 0) - though less critical for this specific bug
-        if abs(q_rand[0, 5]) < singularity_threshold:
-            sign = np.sign(q_rand[0, 5]) if q_rand[0, 5] != 0 else 1.0
-            q_rand[0, 5] = sign * singularity_threshold
+    # Avoid Wrist Singularity (q[5] ≈ 0) - though less critical for this specific bug
+    if abs(q_rand[0, 5]) < singularity_threshold:
+        sign = np.sign(q_rand[0, 5]) if q_rand[0, 5] != 0 else 1.0
+        q_rand[0, 5] = sign * singularity_threshold
 
-        return q_rand[0]
-
-    # Handle batch case (2D array)
-    else:
-        # Vectorized fix for Shoulder (Index 1)
-        # Find indices where q is too close to 0
-        shoulder_mask = np.abs(q_rand[:, 1]) < singularity_threshold
-        # Create a sign vector (replace 0s with 1s)
-        signs = np.sign(q_rand[:, 1])
-        signs[signs == 0] = 1.0
-        # Apply shift
-        q_rand[shoulder_mask, 1] = signs[shoulder_mask] * singularity_threshold
-
-        return q_rand
+    return q_rand[0]
 
 
 def get_random_pose_in_isocube():
@@ -177,7 +162,7 @@ def test_ik_full_consistency(robot_type):
                 continue
 
             valid_sols_count += 1
-            pose_check = frankik.fk(sol)
+            pose_check = frankik.fk(sol)  # type: ignore
 
             # Every returned solution must result in the target pose
             np.testing.assert_allclose(
@@ -193,6 +178,7 @@ def test_ik_full_consistency(robot_type):
 def test_limits_respected():
     """Sanity check that our random generator respects limits."""
     q_min, q_max = frankik.q_min_panda, frankik.q_max_panda
-    q = generate_random_q(q_min, q_max, n=100)
-    assert np.all(q >= q_min)
-    assert np.all(q <= q_max)
+    for _ in range(100):
+        q = generate_random_q(q_min, q_max)
+        assert np.all(q >= q_min)
+        assert np.all(q <= q_max)

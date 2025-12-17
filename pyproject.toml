@@ -1,5 +1,12 @@
 [build-system]
-requires = []
+requires = [
+    "build",
+    "wheel",
+    "scikit-build-core>=0.3.3",
+    "pybind11",
+    "cmake",
+    "ninja",
+]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -26,9 +33,7 @@ dev = [
     "isort==5.13.2",
     "mypy==1.10.1",
     "types-requests~=2.31",
-    # temporarily use fixed version until PR #275 is merged
-    # pybind11-stubgen==2.5.5
-    "pybind11-stubgen @ git+https://github.com/juelg/pybind11-stubgen@fix/class-sorting",
+    "pybind11-stubgen==2.5.5",
     "pytest==8.1.1",
     "commitizen~=3.28.0",
     "clang",

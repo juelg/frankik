@@ -29,9 +29,24 @@ print(q)
 sudo apt install libeigen3-dev
 git clone https://github.com/juelg/frankik.git
 cd frankik
-pip install requirements.txt
-pip install -ve '.[dev]' --no-build-isolation
+pip install .
 ```
+### Development installation
+```shell
+pip install -ve '.[dev]'
+```
+### Development Tools
+```shell
+# python code formatting
+make pyformat
+# python code linting
+make pylint
+# cpp code linting
+make cpplint
+# automatic stubfile generation (for changes in bindings)
+make stubgen
+```
+
 
 ## Installation from PyPI
 Coming soon...

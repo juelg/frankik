@@ -30,7 +30,8 @@ class FrankaKinematics:
             ValueError: If an unsupported robot type is provided.
         """
         if robot_type not in (RobotType.PANDA, RobotType.FR3):
-            raise ValueError(f"Unsupported robot type: {robot_type}. Choose 'panda' or 'fr3'.")
+            msg = f"Unsupported robot type: {robot_type}. Choose 'panda' or 'fr3'."
+            raise ValueError(msg)
         self.robot_type = robot_type
         self.q_min = q_min_fr3 if robot_type == RobotType.FR3 else q_min_panda
         self.q_max = q_max_fr3 if robot_type == RobotType.FR3 else q_max_panda
@@ -51,7 +52,7 @@ class FrankaKinematics:
         T_inv = np.eye(4)
         T_inv[:3, :3] = R.T
         T_inv[:3, 3] = -R.T @ t
-        return T_inv
+        return T_inv  # type: ignore
 
     def forward(
         self,
@@ -67,7 +68,7 @@ class FrankaKinematics:
             np.ndarray: A 4x4 homogeneous transformation matrix representing the end-effector pose.
         """
         pose = fk(q0)
-        return pose @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose
+        return pose @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose  # type: ignore
 
     def inverse(
         self,
@@ -88,13 +89,13 @@ class FrankaKinematics:
             np.ndarray | None: A 7-element array representing the joint angles if a solution is found; otherwise, None.
         """
         new_pose = pose @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose
-        q = ik(new_pose, q0, q7=q7, is_fr3=(self.robot_type == RobotType.FR3))
+        q = ik(new_pose, q0, q7=q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
 
         if not np.isnan(q).any():
             return q
         if not allow_elbow_flips:
             return None
-        qs = ik_full(new_pose, q0, q7=q7, is_fr3=(self.robot_type == RobotType.FR3))
+        qs = ik_full(new_pose, q0, q7=q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
         qs_list = list(qs)
         # drop nan solutions
         qs_list = [q for q in qs_list if not np.isnan(q).any()]
@@ -104,8 +105,7 @@ class FrankaKinematics:
             q0 = self.q_home
 
         # find the closest solution
-        best_q = min(qs_list, key=lambda q_sol: np.linalg.norm(q_sol - q0))
-        return best_q
+        return min(qs_list, key=lambda q_sol: np.linalg.norm(q_sol - q0))  # type: ignore
 
 
 __all__ = [
