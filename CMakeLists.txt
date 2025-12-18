@@ -35,7 +35,7 @@ find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 FetchContent_Declare(pybind11
     GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG v2.13.4
+    GIT_TAG v3.0.1
     GIT_PROGRESS TRUE
     EXCLUDE_FROM_ALL
 )

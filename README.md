@@ -9,17 +9,9 @@
 import numpy as np
 from frankik import FrankaKinematics, RobotType
 kinematics = FrankaKinematics(robot_type=RobotType.FR3) # Robot.Type.PANDA also supported
-q_home = np.array([
-    0.0, 
-    -np.pi / 4, 
-    0.0, 
-    -3 * np.pi / 4, 
-    0.0, 
-    np.pi / 2, 
-    np.pi / 4
-])
-pose_home = kinematics.forward(q_home)
-q = kinematics.inverse(pose_home)
+q_home = np.array([0.0, -np.pi / 4, 0.0, -3 * np.pi / 4, 0.0, np.pi / 2, np.pi / 4])
+pose_home = kinematics.forward(q_home, tcp_offset=kinematics.FrankaHandTCPOffset)
+q = kinematics.inverse(pose_home, tcp_offset=kinematics.FrankaHandTCPOffset, q0=q_home)
 assert np.allclose(q, q_home)
 print(q)
 ```

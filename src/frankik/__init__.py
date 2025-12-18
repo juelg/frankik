@@ -21,6 +21,15 @@ class RobotType:
 
 
 class FrankaKinematics:
+    FrankaHandTCPOffset = np.array(
+        [
+            [0.707, 0.707, 0.0, 0.0],
+            [-0.707, 0.707, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.1034],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
 
     def __init__(self, robot_type: str = RobotType.FR3):
         """Initialize Franka Kinematics for the specified robot type.
@@ -68,7 +77,8 @@ class FrankaKinematics:
             np.ndarray: A 4x4 homogeneous transformation matrix representing the end-effector pose.
         """
         pose = fk(q0)
-        return pose @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose  # type: ignore
+        # pose with franka hand tcp offset
+        return pose @ self.FrankaHandTCPOffset @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose  # type: ignore
 
     def inverse(
         self,
@@ -85,6 +95,7 @@ class FrankaKinematics:
             tcp_offset (np.ndarray, optional): A 4x4 homogeneous transformation matrix representing
                 the tool center point offset. Defaults to None.
             allow_elbow_flips (bool): Whether to consider multiple IK solutions (elbow flips). Defaults to False.
+            q7 (float): The angle of the seventh joint, used for FR3 robot IK. Defaults to π/4.
         Returns:
             np.ndarray | None: A 7-element array representing the joint angles if a solution is found; otherwise, None.
         """

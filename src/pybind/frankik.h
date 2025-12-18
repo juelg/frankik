@@ -1,9 +1,10 @@
 #ifndef FRANKIK_H
 #define FRANKIK_H
 
-#include "Eigen/Dense"
 #include <array>
 #include <cmath>
+
+#include "Eigen/Dense"
 
 namespace frankik {
 
@@ -12,20 +13,20 @@ typedef Eigen::Matrix<double, 7, 1, Eigen::ColMajor> Vector7d;
 const double d1 = 0.3330;
 const double d3 = 0.3160;
 const double d5 = 0.3840;
-const double d7e = 0.2104;
+const double d7e = 0.107;
 const double a4 = 0.0825;
 const double a7 = 0.0880;
 
 // Pre-calculated squares for IK speed
-const double LL24 = 0.10666225;    // a4^2 + d3^2
-const double LL46 = 0.15426225;    // a4^2 + d5^2
-const double L24 = 0.326591870689; // sqrt(LL24)
-const double L46 = 0.392762332715; // sqrt(LL46)
+const double LL24 = 0.10666225;     // a4^2 + d3^2
+const double LL46 = 0.15426225;     // a4^2 + d5^2
+const double L24 = 0.326591870689;  // sqrt(LL24)
+const double L46 = 0.392762332715;  // sqrt(LL46)
 
 // Pre-calculated geometric angles
-const double thetaH46 = 1.35916951803;  // atan(d5/a4);
-const double theta342 = 1.31542071191;  // atan(d3/a4);
-const double theta46H = 0.211626808766; // acot(d5/a4);
+const double thetaH46 = 1.35916951803;   // atan(d5/a4);
+const double theta342 = 1.31542071191;   // atan(d3/a4);
+const double theta46H = 0.211626808766;  // acot(d5/a4);
 
 const std::array<double, 7> q_min_panda = {
     {-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973}};
@@ -38,13 +39,12 @@ const std::array<double, 7> q_max_fr3 = {
     {2.3093, 1.5133, 2.4937, -0.4461, 2.4800, 4.2094, 2.6895}};
 
 const Vector7d kQDefault =
-    (Vector7d() << 0.0, -M_PI_4, 0.0, -3 * M_PI_4, 0.0, M_PI_2, M_PI_4)
-        .finished();
+    (Vector7d() << 0.0, -M_PI_4, 0.0, -3 * M_PI_4, 0.0, M_PI_2, 0.0).finished();
 
-Eigen::Matrix<double, 4, 7>
-ik_full(Eigen::Matrix<double, 4, 4> O_T_EE,
-        std::optional<Vector7d> q_actual = std::nullopt, double q7 = M_PI_4,
-        bool is_fr3 = false) {
+Eigen::Matrix<double, 4, 7> ik_full(
+    Eigen::Matrix<double, 4, 4> O_T_EE,
+    std::optional<Vector7d> q_actual = std::nullopt, double q7 = M_PI_4,
+    bool is_fr3 = false) {
   Vector7d q_actual_array = q_actual.value_or(kQDefault);
   const Eigen::Matrix<double, 4, 7> q_all_NAN =
       Eigen::Matrix<double, 4, 7>::Constant(
@@ -56,10 +56,8 @@ ik_full(Eigen::Matrix<double, 4, 4> O_T_EE,
   const std::array<double, 7> q_min = is_fr3 ? q_min_fr3 : q_min_panda;
   const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
 
-  if (q7 <= q_min[6] || q7 >= q_max[6])
-    return q_all_NAN;
-  for (int i = 0; i < 4; i++)
-    q_all(i, 6) = q7;
+  if (q7 <= q_min[6] || q7 >= q_max[6]) return q_all_NAN;
+  for (int i = 0; i < 4; i++) q_all(i, 6) = q7;
 
   // compute p_6
   Eigen::Matrix3d R_EE = O_T_EE.topLeftCorner<3, 3>();
@@ -70,7 +68,7 @@ ik_full(Eigen::Matrix<double, 4, 4> O_T_EE,
   Eigen::Vector3d p_7 = p_EE - d7e * z_EE;
 
   Eigen::Vector3d x_EE_6;
-  x_EE_6 << std::cos(q7 - M_PI_4), -std::sin(q7 - M_PI_4), 0.0;
+  x_EE_6 << std::cos(q7), -std::sin(q7), 0.0;
   Eigen::Vector3d x_6 = R_EE * x_EE_6;
   x_6 /= x_6.norm();
 
@@ -79,21 +77,18 @@ ik_full(Eigen::Matrix<double, 4, 4> O_T_EE,
 
   // compute q4
   Eigen::Vector3d p_2;
-  p_2 << 0.0, 0.0, d1; // Use constant d1
+  p_2 << 0.0, 0.0, d1;  // Use constant d1
   Eigen::Vector3d V26 = p_6 - p_2;
 
   double LL26 = V26.squaredNorm();
   double L26 = std::sqrt(LL26);
 
-  if (L24 + L46 < L26 || L24 + L26 < L46 || L26 + L46 < L24)
-    return q_all_NAN;
+  if (L24 + L46 < L26 || L24 + L26 < L46 || L26 + L46 < L24) return q_all_NAN;
 
   double theta246 = std::acos((LL24 + LL46 - LL26) / 2.0 / L24 / L46);
   double q4 = theta246 + thetaH46 + theta342 - 2.0 * M_PI;
-  if (q4 <= q_min[3] || q4 >= q_max[3])
-    return q_all_NAN;
-  for (int i = 0; i < 4; i++)
-    q_all(i, 3) = q4;
+  if (q4 <= q_min[3] || q4 >= q_max[3]) return q_all_NAN;
+  for (int i = 0; i < 4; i++) q_all(i, 3) = q4;
 
   // compute q6
   double theta462 = std::acos((LL26 + LL46 - LL24) / 2.0 / L26 / L46);
@@ -129,8 +124,7 @@ ik_full(Eigen::Matrix<double, 4, 4> O_T_EE,
       q_all(2 * i + 1, 5) = q6[i];
     }
   }
-  if (std::isnan(q_all(0, 5)) && std::isnan(q_all(2, 5)))
-    return q_all_NAN;
+  if (std::isnan(q_all(0, 5)) && std::isnan(q_all(2, 5))) return q_all_NAN;
 
   // compute q1 & q2
   double thetaP26 = 3.0 * M_PI_2 - theta462 - theta246 - theta342;
@@ -253,24 +247,23 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   double s6_a = std::sin(q_actual_array[5]);
 
   std::array<Eigen::Matrix<double, 4, 4>, 7> As_a;
-  As_a[0] << c1_a, -s1_a, 0.0, 0.0, // O1
+  As_a[0] << c1_a, -s1_a, 0.0, 0.0,  // O1
       s1_a, c1_a, 0.0, 0.0, 0.0, 0.0, 1.0, d1, 0.0, 0.0, 0.0, 1.0;
-  As_a[1] << c2_a, -s2_a, 0.0, 0.0, // O2
+  As_a[1] << c2_a, -s2_a, 0.0, 0.0,  // O2
       0.0, 0.0, 1.0, 0.0, -s2_a, -c2_a, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;
-  As_a[2] << c3_a, -s3_a, 0.0, 0.0, // O3
+  As_a[2] << c3_a, -s3_a, 0.0, 0.0,  // O3
       0.0, 0.0, -1.0, -d3, s3_a, c3_a, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;
-  As_a[3] << c4_a, -s4_a, 0.0, a4, // O4
+  As_a[3] << c4_a, -s4_a, 0.0, a4,  // O4
       0.0, 0.0, -1.0, 0.0, s4_a, c4_a, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;
-  As_a[4] << 1.0, 0.0, 0.0, -a4, // H
+  As_a[4] << 1.0, 0.0, 0.0, -a4,  // H
       0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0;
-  As_a[5] << c5_a, -s5_a, 0.0, 0.0, // O5
+  As_a[5] << c5_a, -s5_a, 0.0, 0.0,  // O5
       0.0, 0.0, 1.0, d5, -s5_a, -c5_a, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;
-  As_a[6] << c6_a, -s6_a, 0.0, 0.0, // O6
+  As_a[6] << c6_a, -s6_a, 0.0, 0.0,  // O6
       0.0, 0.0, -1.0, 0.0, s6_a, c6_a, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;
   std::array<Eigen::Matrix<double, 4, 4>, 7> Ts_a;
   Ts_a[0] = As_a[0];
-  for (unsigned int j = 1; j < 7; j++)
-    Ts_a[j] = Ts_a[j - 1] * As_a[j];
+  for (unsigned int j = 1; j < 7; j++) Ts_a[j] = Ts_a[j - 1] * As_a[j];
 
   // identify q6 case
   Eigen::Vector3d V62_a = Ts_a[1].block<3, 1>(0, 3) - Ts_a[6].block<3, 1>(0, 3);
@@ -289,9 +282,9 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   Eigen::Vector3d p_7 = p_EE - d7e * z_EE;
 
   Eigen::Vector3d x_EE_6;
-  x_EE_6 << std::cos(q7 - M_PI_4), -std::sin(q7 - M_PI_4), 0.0;
+  x_EE_6 << std::cos(q7), -std::sin(q7), 0.0;
   Eigen::Vector3d x_6 = R_EE * x_EE_6;
-  x_6 /= x_6.norm(); // visibly increases accuracy
+  x_6 /= x_6.norm();  // visibly increases accuracy
 
   Eigen::Vector3d p_6 = p_7 - a7 * x_6;
 
@@ -300,16 +293,14 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   p_2 << 0.0, 0.0, d1;
   Eigen::Vector3d V26 = p_6 - p_2;
 
-  double LL26 = V26.squaredNorm(); // Optimized to squaredNorm()
+  double LL26 = V26.squaredNorm();  // Optimized to squaredNorm()
   double L26 = std::sqrt(LL26);
 
-  if (L24 + L46 < L26 || L24 + L26 < L46 || L26 + L46 < L24)
-    return q_NAN;
+  if (L24 + L46 < L26 || L24 + L26 < L46 || L26 + L46 < L24) return q_NAN;
 
   double theta246 = std::acos((LL24 + LL46 - LL26) / 2.0 / L24 / L46);
   q[3] = theta246 + thetaH46 + theta342 - 2.0 * M_PI;
-  if (q[3] <= q_min[3] || q[3] >= q_max[3])
-    return q_NAN;
+  if (q[3] <= q_min[3] || q[3] >= q_max[3]) return q_NAN;
 
   // IK: compute q6
   double theta462 = std::acos((LL26 + LL46 - LL24) / 2.0 / L26 / L46);
@@ -338,8 +329,7 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   else if (q[5] >= q_max[5])
     q[5] -= 2.0 * M_PI;
 
-  if (q[5] <= q_min[5] || q[5] >= q_max[5])
-    return q_NAN;
+  if (q[5] <= q_min[5] || q[5] >= q_max[5]) return q_NAN;
 
   // IK: compute q1 & q2
   double thetaP26 = 3.0 * M_PI_2 - theta462 - theta246 - theta342;
@@ -389,8 +379,7 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   Eigen::Vector3d x_2_3 = R_2.transpose() * x_3;
   q[2] = std::atan2(x_2_3[2], x_2_3[0]);
 
-  if (q[2] <= q_min[2] || q[2] >= q_max[2])
-    return q_NAN;
+  if (q[2] <= q_min[2] || q[2] >= q_max[2]) return q_NAN;
 
   // IK: compute q5
   Eigen::Vector3d VH4 = p_2 + d3 * z_3 + a4 * x_3 - p_6 + d5 * z_5;
@@ -402,13 +391,13 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   Eigen::Vector3d V_5_H4 = R_5.transpose() * VH4;
 
   q[4] = -std::atan2(V_5_H4[1], V_5_H4[0]);
-  if (q[4] <= q_min[4] || q[4] >= q_max[4])
-    return q_NAN;
+  if (q[4] <= q_min[4] || q[4] >= q_max[4]) return q_NAN;
 
   return q;
 }
 
-Eigen::Matrix<double, 4, 4> fk(const Eigen::Matrix<double, 7, 1> &q) {
+Eigen::Matrix<double, 4, 4> fk(const Eigen::Matrix<double, 7, 1>& q) {
+  const double d7e = 0.2104;
   Eigen::Matrix<double, 4, 4> pose;
   pose.setZero();
 
@@ -725,6 +714,6 @@ Eigen::Matrix<double, 4, 4> fk(const Eigen::Matrix<double, 7, 1> &q) {
   return pose;
 }
 
-} // namespace frankik
+}  // namespace frankik
 
-#endif // FRANKIK_H
+#endif  // FRANKIK_H
