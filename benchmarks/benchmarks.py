@@ -2,6 +2,7 @@ import time
 import typing
 
 import genesis as gs
+import matplotlib.pyplot as plt
 import numpy as np
 import rcs
 import rcs_robotics_library
@@ -296,8 +297,8 @@ def benchmark_all():
         (FrankIK, 1000),
         (RoboticstoolboxPython, 1000),  # numpy version needs to be below 2.0
         (FastIK, 1000),
-        (RoboticsLibrary, 1000),
         (PinocchioCPP, 1000),
+        (RoboticsLibrary, 1000),
         (ManipulaPy, 1000),
         (GenesisWorld, 1000),
         (IKPy, 100),
@@ -344,6 +345,44 @@ def benchmark_all():
         else:
             print(f"{entry['name']:<25} | FAILED: {entry['error']}")
     print("=" * 95 + "\n")
+
+    plot_results(benchmark_data)
+
+
+def plot_results(benchmark_data):
+    # Filter out failed benchmarks
+    successful_benchmarks = [entry for entry in benchmark_data if entry["status"] == "OK"]
+
+    if not successful_benchmarks:
+        print("No successful benchmarks to plot.")
+        return
+
+    library_names = [entry["name"] for entry in successful_benchmarks]
+    ik_small_times = [entry["results"][1] for entry in successful_benchmarks]
+    ik_large_times = [entry["results"][3] for entry in successful_benchmarks]
+
+    n_libraries = len(library_names)
+    bar_width = 0.35
+    index = np.arange(n_libraries)
+
+    # Create a single plot for Inverse Kinematics
+    fig, ax = plt.subplots(figsize=(10, 6))
+    # fig.suptitle("Inverse Kinematics Benchmark Results", fontsize=16)
+
+    # Plot IK times
+    ax.bar(index, ik_small_times)
+    # ax.bar(index - bar_width/2, ik_small_times, bar_width, label="IK Small Perturbation")
+    # ax.bar(index + bar_width/2, ik_large_times, bar_width, label="IK Large Perturbation")
+
+    ax.set_ylabel("Time (s) - Log Scale")
+    ax.set_title("Inverse Kinematics Speed")
+    ax.set_xticks(index)
+    ax.set_xticklabels(library_names, rotation=45, ha="right")
+    ax.set_yscale("log")  # Set y-axis to logarithmic scale
+    ax.legend()
+    ax.grid(axis="y", linestyle="--", alpha=0.7)
+
+    plt.savefig("benchmark_results.svg", format="svg", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":
