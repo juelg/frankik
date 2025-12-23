@@ -8,13 +8,23 @@ import typing
 
 import numpy
 
-__all__: list[str] = ["fk", "ik", "ik_full", "kQDefault", "q_max_fr3", "q_max_panda", "q_min_fr3", "q_min_panda"]
+__all__: list[str] = [
+    "fk",
+    "ik",
+    "ik_full",
+    "ik_sample_q7",
+    "kQDefault",
+    "q_max_fr3",
+    "q_max_panda",
+    "q_min_fr3",
+    "q_min_panda",
+]
 
 def fk(
     q: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]
 ) -> numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]]:
     """
-    Compute forward kinematics for Franka Emika Panda robot.
+    Compute forward kinematics for Franka robot.
 
     Args:
         q (Vector7d): Joint angles.
@@ -30,7 +40,7 @@ def ik(
     is_fr3: bool = False,
 ) -> numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]:
     """
-    Compute one inverse kinematics solution for Franka Emika Panda robot.
+    Compute one inverse kinematics solution for Franka robot.
 
     Args:
         O_T_EE (Eigen::Matrix<double, 4, 4>): Desired end-effector pose.
@@ -49,7 +59,7 @@ def ik_full(
     is_fr3: bool = False,
 ) -> numpy.ndarray[tuple[typing.Literal[4], typing.Literal[7]], numpy.dtype[numpy.float64]]:
     """
-    Compute full inverse kinematics for Franka Emika Panda robot.
+    Compute full inverse kinematics for Franka robot.
 
     Args:
         O_T_EE (Eigen::Matrix<double, 4, 4>): Desired end-effector pose.
@@ -59,6 +69,27 @@ def ik_full(
 
     Returns:
         Eigen::Matrix<double, 4, 7>: All possible IK solutions (up to 4). NaN if no solution.
+    """
+
+def ik_sample_q7(
+    O_T_EE: numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]],
+    q_actual: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]],
+    is_fr3: bool = False,
+    sample_size: int = 30,
+    sample_interval: float = 10,
+) -> numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]:
+    """
+    Compute one inverse kinematics solution for Franka with sampling of joint q7.
+
+    Args:
+        O_T_EE (Eigen::Matrix<double, 4, 4>): Desired end-effector pose.
+        q_actual (Vector7d): Current joint angles.
+        is_fr3 (bool, optional): Whether to use FR3 joint limits. Defaults to false.
+        sample_size (int, optional): How many sample to try for q7. Defaults to 20.
+        sample_interval (int, optional): Sample interval for q7 in degree. Defaults to 90.
+
+    Returns:
+        Vector7d: One IK solution. NaN if no solution.
     """
 
 __version__: str = "0.1"

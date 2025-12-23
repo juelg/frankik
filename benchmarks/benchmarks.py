@@ -53,7 +53,7 @@ class FrankIK(Kinematics):
         return self.frankik.forward(q0)
 
     def inverse(self, pose, q0=None):
-        return self.frankik.inverse(pose, q0=q0)
+        return self.frankik.inverse(pose, q0=q0, q7=np.pi/4)
 
 
 class PinocchioCPP(Kinematics):

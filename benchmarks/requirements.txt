@@ -3,3 +3,4 @@ ikpy
 ManipulaPy
 genesis-world
 roboticstoolbox-python
+matplotlib

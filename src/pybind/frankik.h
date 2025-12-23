@@ -3,8 +3,8 @@
 
 #include <array>
 #include <cmath>
-
-#include "Eigen/Dense"
+#include <eigen3/Eigen/Eigen>
+#include <limits>
 
 namespace frankik {
 
@@ -394,6 +394,50 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   if (q[4] <= q_min[4] || q[4] >= q_max[4]) return q_NAN;
 
   return q;
+}
+
+Vector7d ik_sample_q7(Eigen::Matrix<double, 4, 4> O_T_EE, Vector7d q_actual,
+                      bool is_fr3 = false, const size_t sample_size = 30,
+                      const double sample_interval = 10) {
+  const std::array<double, 7> q_min = is_fr3 ? q_min_fr3 : q_min_panda;
+  const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
+
+  auto q7 = q_actual[6];
+
+  // sample interval in degree
+  auto low7 = q7 - (sample_interval / 2.0) / 180.0 * M_PI;
+  auto high7 = q7 + (sample_interval / 2.0) / 180.0 * M_PI;
+
+  auto sample_step_size = (high7 - low7) / sample_size;
+
+  Vector7d ik_solution =
+      Vector7d::Constant(std::numeric_limits<double>::quiet_NaN());
+  double loss = std::numeric_limits<double>::max();
+
+  // shift if interval goes over the edges
+  if (low7 < q_min[6]) {
+    auto diff = q_min[6] - low7;
+    low7 += diff;
+    high7 += diff;
+  } else if (high7 > q_max[6]) {
+    auto diff = high7 - q_max[6];
+    low7 -= diff;
+    high7 -= diff;
+  }
+  for (size_t i = 0; i <= sample_size; ++i) {
+    // last step is to try the current q7 position
+    q7 = i < sample_size ? low7 + sample_step_size * i : q_actual[6];
+    auto tmp_ik_sol = ik(O_T_EE, q_actual, q7, is_fr3);
+    if (std::isnan(tmp_ik_sol[0])) {
+      continue;
+    }
+    auto tmp_loss = (tmp_ik_sol - q_actual).norm();
+    if (tmp_loss < loss) {
+      loss = tmp_loss;
+      ik_solution = tmp_ik_sol;
+    }
+  }
+  return ik_solution;
 }
 
 Eigen::Matrix<double, 4, 4> fk(const Eigen::Matrix<double, 7, 1>& q) {

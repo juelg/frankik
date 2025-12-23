@@ -7,6 +7,7 @@ from frankik._core import (
     fk,
     ik,
     ik_full,
+    ik_sample_q7,
     kQDefault,
     q_max_fr3,
     q_max_panda,
@@ -85,38 +86,29 @@ class FrankaKinematics:
         pose: np.ndarray[tuple[typing.Literal[4], typing.Literal[4]], np.dtype[np.float64]],
         q0: np.ndarray[tuple[typing.Literal[7]], np.dtype[np.float64]] | None = None,
         tcp_offset: np.ndarray[tuple[typing.Literal[4], typing.Literal[4]], np.dtype[np.float64]] | None = None,
-        allow_elbow_flips: bool = False,
-        q7: float = np.pi / 4,
+        q7: float | None = None,
     ) -> np.ndarray[tuple[typing.Literal[7]], np.dtype[np.float64]] | None:
         """Compute the inverse kinematics for the given end-effector pose.
+
         Args:
             pose (np.ndarray): A 4x4 homogeneous transformation matrix representing the desired end-effector pose.
             q0 (np.ndarray, optional): A 7-element array representing the current joint angles. Defaults to None.
             tcp_offset (np.ndarray, optional): A 4x4 homogeneous transformation matrix representing
                 the tool center point offset. Defaults to None.
-            allow_elbow_flips (bool): Whether to consider multiple IK solutions (elbow flips). Defaults to False.
-            q7 (float): The angle of the seventh joint, used for FR3 robot IK. Defaults to π/4.
+            q7 (float, optional): The angle of the seventh joint, used for FR3 robot IK. If None then it will be sampled. Defaults to None.
+
         Returns:
             np.ndarray | None: A 7-element array representing the joint angles if a solution is found; otherwise, None.
         """
         new_pose = pose @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose
-        q = ik(new_pose, q0, q7=q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
+        if q7 is not None:
+            q = ik(new_pose, q0, q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
+        else:
+            q = ik_sample_q7(new_pose, q0, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
 
-        if not np.isnan(q).any():
-            return q
-        if not allow_elbow_flips:
+        if np.isnan(q).any():
             return None
-        qs = ik_full(new_pose, q0, q7=q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
-        qs_list = list(qs)
-        # drop nan solutions
-        qs_list = [q for q in qs_list if not np.isnan(q).any()]
-        if len(qs_list) == 0:
-            return None
-        if q0 is None:
-            q0 = self.q_home
-
-        # find the closest solution
-        return min(qs_list, key=lambda q_sol: np.linalg.norm(q_sol - q0))  # type: ignore
+        return q
 
 
 __all__ = [
