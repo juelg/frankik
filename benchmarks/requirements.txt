@@ -1,7 +1,5 @@
-# pyroboplan -> uses differential pinocchio ik
-# pin-pink -> uses pinocchio ik
-# ikpy
+numpy<2.0 # required for roboticstoolbox-python
+ikpy
 ManipulaPy
-# pinocchio python
 genesis-world
 roboticstoolbox-python

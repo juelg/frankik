@@ -1,8 +1,14 @@
 import time
 import typing
+
+import genesis as gs
 import numpy as np
+import rcs
+import rcs_robotics_library
+from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 from frankik import FrankaKinematics
+
 
 class Kinematics:
     def forward(
@@ -37,72 +43,78 @@ class Kinematics:
         """
         raise NotImplementedError
 
+
 class FrankIK(Kinematics):
     def __init__(self):
         self.frankik = FrankaKinematics(robot_type="panda")
 
     def forward(self, q0):
         return self.frankik.forward(q0)
-    
+
     def inverse(self, pose, q0=None):
         return self.frankik.inverse(pose, q0=q0)
 
 
 class PinocchioCPP(Kinematics):
     def __init__(self):
-        import rcs
         self.ik = rcs.common.Pin(
-            "/home/tobi/coding/frankik/benchmarks/robot-control-stack/assets/scenes/fr3_empty_world/robot.xml",
+            "robot-control-stack/assets/scenes/fr3_empty_world/robot.xml",
             "attachment_site_0",
             urdf=False,
         )
+
     def forward(self, q0):
-        import rcs
         return self.ik.forward(q0).pose_matrix()
-    
+
     def inverse(self, pose, q0=None):
-        import rcs
         pose = rcs.common.Pose(pose_matrix=pose)
         return self.ik.inverse(pose, q0=q0)
-    
+
+
 class RoboticsLibrary(Kinematics):
     def __init__(self):
-        import rcs_robotics_library
-        self.ik = rcs_robotics_library.rl.RoboticsLibraryIK("/home/tobi/coding/frankik/benchmarks/robot-control-stack/assets/fr3/urdf/fr3.urdf")
+        self.ik = rcs_robotics_library.rl.RoboticsLibraryIK("robot-control-stack/assets/fr3/urdf/fr3.urdf")
+
     def forward(self, q0):
         return self.ik.forward(q0).pose_matrix()
-    
+
     def inverse(self, pose, q0=None):
-        import rcs
         pose = rcs.common.Pose(pose_matrix=pose)
         return self.ik.inverse(pose, q0=q0)
 
 
-# class IKPy(Kinematics):
-#     def __init__(self):
-#         import ikpy
-#         from ikpy.chain import Chain
-#         self.chain = Chain.from_urdf_file("robot-control-stack/assets/fr3/urdf/fr3.urdf")
+class IKPy(Kinematics):
+    def __init__(self):
+        from ikpy.chain import Chain
 
-#     def forward(self, q0):
-#         return self.chain.forward_kinematics(q0)
-    
-#     def inverse(self, pose, q0=None):
-#         ik_results = self.chain.inverse_kinematics(pose, initial_position=q0)
-#         if ik_results is None:
-#             return None
-#         return ik_results[1:8]  # Exclude the first element which is for the base
+        self.chain = Chain.from_urdf_file("robot-control-stack/assets/fr3/urdf/fr3.urdf", base_elements=["fr3_link0"])
 
+    def forward(self, q0):
+        q = np.zeros(9)
+        q[1:8] = q0
+        return self.chain.forward_kinematics(q)
+
+    def inverse(self, pose, q0=None):
+        q = np.zeros(9)
+        q[1:8] = q0
+        pose = rcs.common.Pose(pose_matrix=pose)
+        ik_results = self.chain.inverse_kinematics(
+            pose.translation(), initial_position=q
+        )  # , pose.xyzrpy()[3:]) #, orientation_mode="all")
+        if ik_results is None:
+            return None
+        return ik_results[1:8]  # Exclude the first element which is for the base
 
 
 class RoboticstoolboxPython(Kinematics):
     def __init__(self):
         import roboticstoolbox as rtb
+
         self.robot = rtb.models.Panda()
 
     def forward(self, q0):
         return self.robot.fkine(q0).A
-    
+
     def inverse(self, pose, q0=None):
         ik_results = self.robot.ik_LM(pose, q0=q0)
         return ik_results[0]
@@ -110,8 +122,7 @@ class RoboticstoolboxPython(Kinematics):
 
 class ManipulaPy(Kinematics):
     def __init__(self):
-        from ManipulaPy.urdf_processor import URDFToSerialManipulator
-        urdf_path = "/home/tobi/coding/frankik/benchmarks/robot-control-stack/assets/fr3/urdf/fr3.urdf"
+        urdf_path = "robot-control-stack/assets/fr3/urdf/fr3.urdf"
         self.robot = URDFToSerialManipulator(urdf_path).serial_manipulator
 
     def forward(self, q0):
@@ -126,22 +137,21 @@ class ManipulaPy(Kinematics):
 
 class GenesisWorld(Kinematics):
     def __init__(self):
-        import genesis as gs
         ########################## init ##########################
         gs.init(backend=gs.gpu)
 
         ########################## create a scene ##########################
         self.scene = gs.Scene(
-            sim_options = gs.options.SimOptions(
-                dt = 0.01,
+            sim_options=gs.options.SimOptions(
+                dt=0.01,
             ),
-            viewer_options = gs.options.ViewerOptions(
-                camera_pos    = (3, -1, 1.5),
-                camera_lookat = (0.0, 0.0, 0.5),
-                camera_fov    = 30,
-                max_FPS       = 60,
+            viewer_options=gs.options.ViewerOptions(
+                camera_pos=(3, -1, 1.5),
+                camera_lookat=(0.0, 0.0, 0.5),
+                camera_fov=30,
+                max_FPS=60,
             ),
-            show_viewer = True,
+            show_viewer=False,
         )
 
         ########################## entities ##########################
@@ -150,12 +160,12 @@ class GenesisWorld(Kinematics):
         )
         cube = self.scene.add_entity(
             gs.morphs.Box(
-                size = (0.04, 0.04, 0.04),
-                pos  = (0.65, 0.0, 0.02),
+                size=(0.04, 0.04, 0.04),
+                pos=(0.65, 0.0, 0.02),
             )
         )
         self.franka = self.scene.add_entity(
-            gs.morphs.MJCF(file="/home/tobi/coding/frankik/mujoco_menagerie/franka_emika_panda/panda.xml"),
+            gs.morphs.MJCF(file="mujoco_menagerie/franka_emika_panda/panda.xml"),
         )
         ########################## build ##########################
         self.scene.build()
@@ -174,40 +184,48 @@ class GenesisWorld(Kinematics):
         )
         self.franka.set_dofs_force_range(
             np.array([-87, -87, -87, -87, -12, -12, -12, -100, -100]),
-            np.array([ 87,  87,  87,  87,  12,  12,  12,  100,  100]),
+            np.array([87, 87, 87, 87, 12, 12, 12, 100, 100]),
         )
-        self.end_effector = self.franka.get_link('hand') # hand_0, attachment_site_0
+        self.end_effector = self.franka.get_link("hand")  # hand_0, attachment_site_0
 
-    def inverse(self, pose, q0 = None):
-        import rcs
+    def inverse(self, pose, q0=None):
         pose = rcs.common.Pose(pose_matrix=pose)
         qpos = self.franka.inverse_kinematics(
-            link = self.end_effector,
-            pos  = pose.translation(),
-            quat = pose.rotation_q(),
+            link=self.end_effector,
+            pos=pose.translation(),
+            quat=pose.rotation_q(),
         )
         return qpos
 
     def forward(self, q0):
-        self.franka.set_dofs_position(q0)
-        self.scene.step()  # update forward kinematics
-        pose = self.end_effector.get_pose()
+        q = np.zeros(9)
+        q[:7] = q0
+
+        # self.franka.set_dofs_position(q)
+        # self.scene.step()  # update forward kinematics
+        self.franka.set_qpos(q)
+        q = self.end_effector.get_quat().cpu().numpy().copy()
+        q2 = q.copy()
+        q[0] = q[3]
+        q[3] = q2[0]
+        pose = rcs.common.Pose(translation=self.end_effector.get_pos().cpu().numpy(), quaternion=q)
+
         return pose.pose_matrix()
 
 
 def test_speed(kinematics: Kinematics, n_iters: int = 1000):
     """
     Benchmarks FK and IK speed for small and large perturbations around home pose.
-    
+
     Returns:
         tuple: (avg_fk_small, avg_ik_small, avg_fk_large, avg_ik_large) in seconds.
     """
     # 1. Setup Data and Seeds
     np.random.seed(42)  # Ensure reproducibility
-    
+
     # We instantiate FrankaKinematics just to get the robot limits/constants
     # independent of the library being tested.
-    ref_robot = FrankaKinematics(robot_type="panda") 
+    ref_robot = FrankaKinematics(robot_type="panda")
     q_home = ref_robot.q_home
     q_min = ref_robot.q_min
     q_max = ref_robot.q_max
@@ -230,12 +248,12 @@ def test_speed(kinematics: Kinematics, n_iters: int = 1000):
         # Measure FK (Small)
         start = time.perf_counter()
         pose_small = kinematics.forward(q_target_small)
-        t_fk_small_acc += (time.perf_counter() - start)
+        t_fk_small_acc += time.perf_counter() - start
 
         # Measure IK (Small) - using q_home as seed
         start = time.perf_counter()
         _ = kinematics.inverse(pose_small, q0=q_home)
-        t_ik_small_acc += (time.perf_counter() - start)
+        t_ik_small_acc += time.perf_counter() - start
 
         # --- Category 2: Large Perturbation (10 deg) ---
         noise_large = np.random.uniform(-deg_10, deg_10, size=7)
@@ -244,39 +262,35 @@ def test_speed(kinematics: Kinematics, n_iters: int = 1000):
         # Measure FK (Large)
         start = time.perf_counter()
         pose_large = kinematics.forward(q_target_large)
-        t_fk_large_acc += (time.perf_counter() - start)
+        t_fk_large_acc += time.perf_counter() - start
 
         # Measure IK (Large) - using q_home as seed
         start = time.perf_counter()
         _ = kinematics.inverse(pose_large, q0=q_home)
-        t_ik_large_acc += (time.perf_counter() - start)
+        t_ik_large_acc += time.perf_counter() - start
 
     # Calculate averages
-    return (
-        t_fk_small_acc / n_iters,
-        t_ik_small_acc / n_iters,
-        t_fk_large_acc / n_iters,
-        t_ik_large_acc / n_iters
-    )
+    return (t_fk_small_acc / n_iters, t_ik_small_acc / n_iters, t_fk_large_acc / n_iters, t_ik_large_acc / n_iters)
 
 
 def benchmark_all():
     kinematics_classes = [
-        FrankIK,
-        RoboticsLibrary,
-        PinocchioCPP,
-        # RoboticstoolboxPython, # numpy problem
-        ManipulaPy, 
-        # GenesisWorld,  # invalid opengl context
+        (FrankIK, 1000),
+        (RoboticsLibrary, 1000),
+        (PinocchioCPP, 1000),
+        (RoboticstoolboxPython, 1000),  # numpy problem
+        (ManipulaPy, 1000),
+        (GenesisWorld, 1000),
+        (IKPy, 100),
     ]
 
     benchmark_data = []
 
-    print("Running benchmarks... (Output suppressed)")
+    print("Running benchmarks... ")
 
-    for cls in kinematics_classes:
+    for cls, n_iters in kinematics_classes:
         library_name = cls.__name__
-        
+
         # We wrap the execution in the suppressor to hide the "crap"
         # printed during init or runtime
         try:
@@ -286,36 +300,32 @@ def benchmark_all():
             t_init = time.perf_counter() - t0
 
             # 2. Measure Speed
-            results = test_speed(instance, n_iters=1000)
-            
+            results = test_speed(instance, n_iters=n_iters)
+
             # Store success
-            benchmark_data.append({
-                "name": library_name,
-                "status": "OK",
-                "t_init": t_init,
-                "results": results
-            })
+            benchmark_data.append({"name": library_name, "status": "OK", "t_init": t_init, "results": results})
 
         except Exception as e:
             # Store failure
-            benchmark_data.append({
-                "name": library_name,
-                "status": "FAIL",
-                "error": str(e)
-            })
+            benchmark_data.append({"name": library_name, "status": "FAIL", "error": str(e)})
 
     # --- Print Table After All Runs ---
-    print("\n" + "="*95)
-    print(f"{'Library':<25} | {'Init (s)':<10} | {'FK-Small(s)':<12} | {'IK-Small(s)':<12} | {'FK-Large(s)':<12} | {'IK-Large(s)':<12}")
+    print("\n" + "=" * 95)
+    print(
+        f"{'Library':<25} | {'Init (s)':<10} | {'FK-Small(s)':<12} | {'IK-Small(s)':<12} | {'FK-Large(s)':<12} | {'IK-Large(s)':<12}"
+    )
     print("-" * 95)
 
     for entry in benchmark_data:
         if entry["status"] == "OK":
             fk_s, ik_s, fk_l, ik_l = entry["results"]
-            print(f"{entry['name']:<25} | {entry['t_init']:<10.5f} | {fk_s:<12.7f} | {ik_s:<12.7f} | {fk_l:<12.7f} | {ik_l:<12.7f}")
+            print(
+                f"{entry['name']:<25} | {entry['t_init']:<10.5f} | {fk_s:<12.7f} | {ik_s:<12.7f} | {fk_l:<12.7f} | {ik_l:<12.7f}"
+            )
         else:
             print(f"{entry['name']:<25} | FAILED: {entry['error']}")
-    print("="*95 + "\n")
+    print("=" * 95 + "\n")
+
 
 if __name__ == "__main__":
     benchmark_all()
