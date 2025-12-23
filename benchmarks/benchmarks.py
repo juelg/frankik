@@ -106,6 +106,24 @@ class IKPy(Kinematics):
         return ik_results[1:8]  # Exclude the first element which is for the base
 
 
+class FastIK(Kinematics):
+
+    def forward(self, q0):
+        from ikfast_franka_panda import get_fk
+
+        trans, rot = get_fk(q0)
+        pose = rcs.common.Pose(translation=np.array(trans), rotation=np.array(rot))
+        return pose.pose_matrix()
+
+    def inverse(self, pose, q0=None):
+        from ikfast_franka_panda import get_ik
+
+        pose = rcs.common.Pose(pose_matrix=pose)
+        return get_ik(
+            trans_list=pose.translation().tolist(), rot_list=pose.rotation_m().tolist(), free_jt_vals=[np.pi / 4]
+        )
+
+
 class RoboticstoolboxPython(Kinematics):
     def __init__(self):
         import roboticstoolbox as rtb
@@ -276,9 +294,10 @@ def test_speed(kinematics: Kinematics, n_iters: int = 1000):
 def benchmark_all():
     kinematics_classes = [
         (FrankIK, 1000),
+        (RoboticstoolboxPython, 1000),  # numpy version needs to be below 2.0
+        (FastIK, 1000),
         (RoboticsLibrary, 1000),
         (PinocchioCPP, 1000),
-        (RoboticstoolboxPython, 1000),  # numpy problem
         (ManipulaPy, 1000),
         (GenesisWorld, 1000),
         (IKPy, 100),
@@ -293,21 +312,21 @@ def benchmark_all():
 
         # We wrap the execution in the suppressor to hide the "crap"
         # printed during init or runtime
-        try:
-            # 1. Measure Init
-            t0 = time.perf_counter()
-            instance = cls()
-            t_init = time.perf_counter() - t0
+        # try:
+        # 1. Measure Init
+        t0 = time.perf_counter()
+        instance = cls()
+        t_init = time.perf_counter() - t0
 
-            # 2. Measure Speed
-            results = test_speed(instance, n_iters=n_iters)
+        # 2. Measure Speed
+        results = test_speed(instance, n_iters=n_iters)
 
-            # Store success
-            benchmark_data.append({"name": library_name, "status": "OK", "t_init": t_init, "results": results})
+        # Store success
+        benchmark_data.append({"name": library_name, "status": "OK", "t_init": t_init, "results": results})
 
-        except Exception as e:
-            # Store failure
-            benchmark_data.append({"name": library_name, "status": "FAIL", "error": str(e)})
+        # except Exception as e:
+        #     # Store failure
+        #     benchmark_data.append({"name": library_name, "status": "FAIL", "error": str(e)})
 
     # --- Print Table After All Runs ---
     print("\n" + "=" * 95)

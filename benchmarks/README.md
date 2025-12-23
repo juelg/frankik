@@ -18,6 +18,13 @@ sudo apt install $(cat extensions/rcs_robotics_library/debian_deps.txt)
 pip install -ve extensions/rcs_robotics_library --no-build-isolation
 ```
 
+## FastIK
+Install fastik_pybind following their [readme instructions](https://github.com/yijiangh/ikfast_pybind).
+- Use python <= 3.10 or update the pybind version
+- Install with `--no-build-isolation`
+
+
+
 ## Others Installation
 ```shell
 pip install -r requirements.txt
@@ -32,12 +39,13 @@ Based on 1000 seeded random trials (except IKPy, it only has 100 trials).
 ===============================================================================================
 Library                   | Init (s)   | FK-Small(s)  | IK-Small(s)  | FK-Large(s)  | IK-Large(s) 
 -----------------------------------------------------------------------------------------------
-FrankIK                   | 0.00001    | 0.0000026    | 0.0000067    | 0.0000027    | 0.0000066   
-RoboticsLibrary           | 0.00109    | 0.0000053    | 0.0001740    | 0.0000051    | 0.0001963   
-PinocchioCPP              | 0.00155    | 0.0000042    | 0.0001371    | 0.0000041    | 0.0001623   
-RoboticstoolboxPython     | 0.74421    | 0.0000143    | 0.0000092    | 0.0000132    | 0.0000109   
-ManipulaPy                | 0.02860    | 0.0002592    | 0.0025176    | 0.0002584    | 0.0026479   
-GenesisWorld              | 4.87590    | 0.0017312    | 0.0043803    | 0.0017249    | 0.0019003   
-IKPy                      | 0.07561    | 0.0000749    | 0.0671296    | 0.0000749    | 0.0623110   
+FrankIK                   | 0.00000    | 0.0000026    | 0.0000064    | 0.0000027    | 0.0000063   
+RoboticstoolboxPython     | 0.74061    | 0.0000144    | 0.0000090    | 0.0000134    | 0.0000107   
+FastIK                    | 0.00000    | 0.0000096    | 0.0000117    | 0.0000091    | 0.0000117   
+RoboticsLibrary           | 0.00152    | 0.0000048    | 0.0001728    | 0.0000048    | 0.0001943   
+PinocchioCPP              | 0.00213    | 0.0000040    | 0.0001340    | 0.0000040    | 0.0001577   
+ManipulaPy                | 0.02772    | 0.0002526    | 0.0024135    | 0.0002532    | 0.0025403   
+GenesisWorld              | 5.14627    | 0.0017383    | 0.0043463    | 0.0017304    | 0.0018944   
+IKPy                      | 0.07135    | 0.0000744    | 0.0673117    | 0.0000734    | 0.0623341   
 ===============================================================================================
 ```
