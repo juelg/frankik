@@ -44,10 +44,21 @@ make stubgen
 Coming soon...
 
 
-## Feature List
-- [x] basic bindings from he
-- [x] support for fr3
-- [x] nice python interface
-- [x] tests
-- [ ] performance benchmarks
+## Speed Benchmark
+See the [benchmark folder](benchmark/).
+The outcome is based on 1000 seeded random trials (except IKPy, it only has 100 trials).
+```shell
+===============================================================================================
+Library                   | Init (s)   | FK-Small(s)  | IK-Small(s)  | FK-Large(s)  | IK-Large(s) 
+-----------------------------------------------------------------------------------------------
+FrankIK                   | 0.00000    | 0.0000026    | 0.0000064    | 0.0000027    | 0.0000063   
+RoboticstoolboxPython     | 0.74061    | 0.0000144    | 0.0000090    | 0.0000134    | 0.0000107   
+FastIK                    | 0.00000    | 0.0000096    | 0.0000117    | 0.0000091    | 0.0000117   
+RoboticsLibrary           | 0.00152    | 0.0000048    | 0.0001728    | 0.0000048    | 0.0001943   
+PinocchioCPP              | 0.00213    | 0.0000040    | 0.0001340    | 0.0000040    | 0.0001577   
+ManipulaPy                | 0.02772    | 0.0002526    | 0.0024135    | 0.0002532    | 0.0025403   
+GenesisWorld              | 5.14627    | 0.0017383    | 0.0043463    | 0.0017304    | 0.0018944   
+IKPy                      | 0.07135    | 0.0000744    | 0.0673117    | 0.0000734    | 0.0623341   
+===============================================================================================
+```
 

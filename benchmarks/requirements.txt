@@ -1,0 +1,5 @@
+numpy<2.0 # required for roboticstoolbox-python
+ikpy
+ManipulaPy
+genesis-world
+roboticstoolbox-python
