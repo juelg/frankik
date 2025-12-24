@@ -409,6 +409,8 @@ Vector7d ik_sample_q7(Eigen::Matrix<double, 4, 4> O_T_EE, Vector7d q_actual,
   auto high7 = q7 + (sample_interval / 2.0) / 180.0 * M_PI;
 
   auto sample_step_size = (high7 - low7) / sample_size;
+  const Vector7d weight =
+    (Vector7d() << 20.0, 15.0, 5.0, 4.0, 3.0, 2.0, 1.0).finished(); // TODO: perhaps we need to sample more
 
   Vector7d ik_solution =
       Vector7d::Constant(std::numeric_limits<double>::quiet_NaN());
@@ -431,7 +433,7 @@ Vector7d ik_sample_q7(Eigen::Matrix<double, 4, 4> O_T_EE, Vector7d q_actual,
     if (std::isnan(tmp_ik_sol[0])) {
       continue;
     }
-    auto tmp_loss = (tmp_ik_sol - q_actual).norm();
+    auto tmp_loss = ((tmp_ik_sol - q_actual).cwiseProduct(weight)).norm();
     if (tmp_loss < loss) {
       loss = tmp_loss;
       ik_solution = tmp_ik_sol;

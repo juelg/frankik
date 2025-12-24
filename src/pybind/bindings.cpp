@@ -59,7 +59,7 @@ PYBIND11_MODULE(_core, m) {
         "    Vector7d: One IK solution. NaN if no solution.");
   m.def("ik_sample_q7", &frankik::ik_sample_q7, py::arg("O_T_EE"),
         py::arg("q_actual"), py::arg("is_fr3") = false,
-        py::arg("sample_size") = 30, py::arg("sample_interval") = 10,
+        py::arg("sample_size") = 60, py::arg("sample_interval") = 40,
         "Compute one inverse kinematics solution for Franka with sampling of "
         "joint q7.\n\n"
         "Args:\n"

@@ -104,7 +104,7 @@ class FrankaKinematics:
         if q7 is not None:
             q = ik(new_pose, q0, q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
         else:
-            q = ik_sample_q7(new_pose, q0, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
+            q = ik_sample_q7(new_pose, q0, is_fr3=(self.robot_type == RobotType.FR3), sample_size=60, sample_interval=40)  # type: ignore
 
         if np.isnan(q).any():
             return None
