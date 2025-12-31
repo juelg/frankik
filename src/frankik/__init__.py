@@ -110,8 +110,20 @@ class FrankaKinematics:
             q0 = self.q_home
 
         new_pose = pose @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose
+
+        def get_min(qs):
+            if len(qs) == 0:
+                return np.nan
+            q_diffs = np.sum((np.array(qs) - q0) * joint_weight, axis=1) ** 2
+            return qs[np.argmin(q_diffs)]
+
         if q7 is not None:
-            q = ik(new_pose, q0, q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
+            if not global_solution:
+                q = ik(new_pose, q0, q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
+            else:
+                qs = ik_full(new_pose, q0, q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
+                q = get_min(qs)
+
         else:
             qs = ik_sample_q7(
                 new_pose,
@@ -121,8 +133,7 @@ class FrankaKinematics:
                 sample_interval=q7_sample_interval,
                 full_ik=global_solution,
             )  # type: ignore
-            q_diffs = np.sum((np.array(qs) - q0) * joint_weight, axis=1) ** 2
-            q = qs[np.argmin(q_diffs)]
+            q = get_min(qs)
 
         if np.isnan(q).any():
             return None
