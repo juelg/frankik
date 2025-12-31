@@ -73,23 +73,27 @@ def ik_full(
 
 def ik_sample_q7(
     O_T_EE: numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]],
-    q_actual: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]],
+    q_actual: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]] | None = None,
     is_fr3: bool = False,
-    sample_size: int = 30,
-    sample_interval: float = 10,
-) -> numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]:
+    sample_size: int = 60,
+    sample_interval: float = 40,
+    full_ik: bool = False,
+) -> list[numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]]:
     """
     Compute one inverse kinematics solution for Franka with sampling of joint q7.
 
     Args:
-        O_T_EE (Eigen::Matrix<double, 4, 4>): Desired end-effector pose.
-        q_actual (Vector7d): Current joint angles.
-        is_fr3 (bool, optional): Whether to use FR3 joint limits. Defaults to false.
+        O_T_EE (np.array): Desired end-effector pose. Shape (4, 4).
+        q_actual (np.array, optional): Current joint angles. Shape (7,).
+
+        is_fr3 (bool, optional): Whether to use FR3 joint limits. Defaults to False.
         sample_size (int, optional): How many sample to try for q7. Defaults to 20.
         sample_interval (int, optional): Sample interval for q7 in degree. Defaults to 90.
+        full_ik (bool, optional): Whether to use full IK. Defaults to False.
+    degree. Defaults to False.
 
     Returns:
-        Vector7d: One IK solution. NaN if no solution.
+        list[np.array]: One IK solution. Empty if no solution was found. Array shape (7,).
     """
 
 __version__: str = "0.1"

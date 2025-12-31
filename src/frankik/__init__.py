@@ -1,5 +1,3 @@
-import typing
-
 import numpy as np
 
 from frankik._core import (
@@ -48,9 +46,7 @@ class FrankaKinematics:
         self.q_home = kQDefault
 
     @staticmethod
-    def pose_inverse(
-        T: np.ndarray[tuple[typing.Literal[4], typing.Literal[4]], np.dtype[np.float64]]
-    ) -> np.ndarray[tuple[typing.Literal[4], typing.Literal[4]], np.dtype[np.float64]]:
+    def pose_inverse(T: np.ndarray) -> np.ndarray:
         """Compute the inverse of a homogeneous transformation matrix.
         Args:
             T (np.ndarray): A 4x4 homogeneous transformation matrix.
@@ -66,9 +62,9 @@ class FrankaKinematics:
 
     def forward(
         self,
-        q0: np.ndarray[tuple[typing.Literal[7]], np.dtype[np.float64]],
-        tcp_offset: np.ndarray[tuple[typing.Literal[4], typing.Literal[4]], np.dtype[np.float64]] | None = None,
-    ) -> np.ndarray[tuple[typing.Literal[4], typing.Literal[4]], np.dtype[np.float64]]:
+        q0: np.ndarray,
+        tcp_offset: np.ndarray | None = None,
+    ) -> np.ndarray:
         """Compute the forward kinematics for the given joint configuration.
         Args:
             q0 (np.ndarray): A 7-element array representing joint angles.
@@ -83,11 +79,15 @@ class FrankaKinematics:
 
     def inverse(
         self,
-        pose: np.ndarray[tuple[typing.Literal[4], typing.Literal[4]], np.dtype[np.float64]],
-        q0: np.ndarray[tuple[typing.Literal[7]], np.dtype[np.float64]] | None = None,
-        tcp_offset: np.ndarray[tuple[typing.Literal[4], typing.Literal[4]], np.dtype[np.float64]] | None = None,
+        pose: np.ndarray,
+        q0: np.ndarray | None = None,
+        tcp_offset: np.ndarray | None = None,
         q7: float | None = None,
-    ) -> np.ndarray[tuple[typing.Literal[7]], np.dtype[np.float64]] | None:
+        global_solution: bool = False,
+        joint_weight: np.ndarray | None = None,
+        q7_sample_interval=40,
+        q7_sample_size=60,
+    ) -> np.ndarray | None:
         """Compute the inverse kinematics for the given end-effector pose.
 
         Args:
@@ -96,15 +96,33 @@ class FrankaKinematics:
             tcp_offset (np.ndarray, optional): A 4x4 homogeneous transformation matrix representing
                 the tool center point offset. Defaults to None.
             q7 (float, optional): The angle of the seventh joint, used for FR3 robot IK. If None then it will be sampled. Defaults to None.
+            global_solution (bool, optional): Whether to consider global ik solutions. Defaults to False.
+            joint_weight (np.ndarray, optional): Weights for calculating the distance between the solution and q0. Defaults to None.
+            q7_sample_interval (int, optional): The interval for sampling q7. Defaults to 40.
+            q7_sample_size (int, optional): The number of samples for q7. Defaults to 60.
 
         Returns:
             np.ndarray | None: A 7-element array representing the joint angles if a solution is found; otherwise, None.
         """
+        if joint_weight is None:
+            joint_weight = np.ones(7)
+        if q0 is None:
+            q0 = self.q_home
+
         new_pose = pose @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose
         if q7 is not None:
             q = ik(new_pose, q0, q7, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
         else:
-            q = ik_sample_q7(new_pose, q0, is_fr3=(self.robot_type == RobotType.FR3))  # type: ignore
+            qs = ik_sample_q7(
+                new_pose,
+                q0,
+                is_fr3=(self.robot_type == RobotType.FR3),
+                sample_size=q7_sample_size,
+                sample_interval=q7_sample_interval,
+                full_ik=global_solution,
+            )  # type: ignore
+            q_diffs = np.sum((np.array(qs) - q0) * joint_weight, axis=1) ** 2
+            q = qs[np.argmin(q_diffs)]
 
         if np.isnan(q).any():
             return None

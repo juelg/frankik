@@ -396,23 +396,23 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   return q;
 }
 
-Vector7d ik_sample_q7(Eigen::Matrix<double, 4, 4> O_T_EE, Vector7d q_actual,
-                      bool is_fr3 = false, const size_t sample_size = 30,
-                      const double sample_interval = 10) {
+std::vector<Vector7d> ik_sample_q7(
+    const Eigen::Matrix<double, 4, 4> O_T_EE,
+    const std::optional<Vector7d> q_actual = std::nullopt, bool is_fr3 = false,
+    size_t sample_size = 30, double sample_interval = 10,
+    bool full_ik = false) {
+  Vector7d q_actual_array = q_actual.value_or(kQDefault);
   const std::array<double, 7> q_min = is_fr3 ? q_min_fr3 : q_min_panda;
   const std::array<double, 7> q_max = is_fr3 ? q_max_fr3 : q_max_panda;
 
-  auto q7 = q_actual[6];
+  auto q7 = q_actual_array[6];
 
   // sample interval in degree
   auto low7 = q7 - (sample_interval / 2.0) / 180.0 * M_PI;
   auto high7 = q7 + (sample_interval / 2.0) / 180.0 * M_PI;
 
   auto sample_step_size = (high7 - low7) / sample_size;
-
-  Vector7d ik_solution =
-      Vector7d::Constant(std::numeric_limits<double>::quiet_NaN());
-  double loss = std::numeric_limits<double>::max();
+  std::vector<Vector7d> ik_solutions;
 
   // shift if interval goes over the edges
   if (low7 < q_min[6]) {
@@ -426,18 +426,24 @@ Vector7d ik_sample_q7(Eigen::Matrix<double, 4, 4> O_T_EE, Vector7d q_actual,
   }
   for (size_t i = 0; i <= sample_size; ++i) {
     // last step is to try the current q7 position
-    q7 = i < sample_size ? low7 + sample_step_size * i : q_actual[6];
-    auto tmp_ik_sol = ik(O_T_EE, q_actual, q7, is_fr3);
-    if (std::isnan(tmp_ik_sol[0])) {
-      continue;
-    }
-    auto tmp_loss = (tmp_ik_sol - q_actual).norm();
-    if (tmp_loss < loss) {
-      loss = tmp_loss;
-      ik_solution = tmp_ik_sol;
+    q7 = i < sample_size ? low7 + sample_step_size * i : q_actual_array[6];
+    if (!full_ik) {
+      auto tmp_ik_sol = ik(O_T_EE, q_actual_array, q7, is_fr3);
+      if (std::isnan(tmp_ik_sol[0])) {
+        continue;
+      }
+      ik_solutions.push_back(tmp_ik_sol);
+    } else {
+      auto tmp_ik_sols = ik_full(O_T_EE, q_actual_array, q7, is_fr3);
+      for (size_t j = 0; j <= 4; ++j) {
+        if (std::isnan(tmp_ik_sols.row(j)[0])) {
+          continue;
+        }
+        ik_solutions.push_back(tmp_ik_sols.row(j));
+      }
     }
   }
-  return ik_solution;
+  return ik_solutions;
 }
 
 Eigen::Matrix<double, 4, 4> fk(const Eigen::Matrix<double, 7, 1>& q) {
