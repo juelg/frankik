@@ -58,21 +58,29 @@ PYBIND11_MODULE(_core, m) {
         "Returns:\n"
         "    Vector7d: One IK solution. NaN if no solution.");
   m.def("ik_sample_q7", &frankik::ik_sample_q7, py::arg("O_T_EE"),
-        py::arg("q_actual"), py::arg("is_fr3") = false,
+        py::arg("q_actual") = std::nullopt, py::arg("is_fr3") = false,
         py::arg("sample_size") = 60, py::arg("sample_interval") = 40,
+        py::arg("full_ik") = false,
         "Compute one inverse kinematics solution for Franka with sampling of "
         "joint q7.\n\n"
         "Args:\n"
-        "    O_T_EE (Eigen::Matrix<double, 4, 4>): Desired end-effector pose.\n"
-        "    q_actual (Vector7d): Current joint angles.\n"
+        "    O_T_EE (np.array): Desired end-effector pose. Shape "
+        "(4, 4).\n"
+        "    q_actual (np.array, optional): Current joint angles. Shape "
+        "(7,).\n"
+        "\n"
         "    is_fr3 (bool, optional): Whether to use FR3 joint limits. "
-        "Defaults to false.\n"
+        "Defaults to False.\n"
         "    sample_size (int, optional): How many sample to try for q7. "
         "Defaults to 20.\n"
         "    sample_interval (int, optional): Sample interval for q7 in "
-        "degree. Defaults to 90.\n\n"
+        "degree. Defaults to 90.\n"
+        "    full_ik (bool, optional): Whether to use full IK. Defaults to "
+        "False.\n"
+        "degree. Defaults to False.\n\n"
         "Returns:\n"
-        "    Vector7d: One IK solution. NaN if no solution.");
+        "    list[np.array]: One IK solution. Empty if no solution was found. "
+        "Array shape (7,).");
   m.def("fk", &frankik::fk, py::arg("q"),
         "Compute forward kinematics for Franka robot.\n\n"
         "Args:\n"
