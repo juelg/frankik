@@ -12,7 +12,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "frankik"
 version = "1.0.0"
-description="Blazing fast, analytical Inverse Kinematics for Franka Emika Panda and FR3 robots. Lightweight Python bindings, no ROS required."
+description="Standalone blazing fast, analytical inverse kinematics for Franka Panda and FR3 robots."
 readme = "README.md"
 dependencies = [
     "numpy",
