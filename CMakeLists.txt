@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.15)
 project(
     frankik
     LANGUAGES C CXX
-    VERSION 0.1
+    VERSION 1.0.0
     DESCRIPTION "Blazing fast, analytical Inverse Kinematics for Franka Emika Panda and FR3 robots. Lightweight Python bindings, no ROS required."
 )
 

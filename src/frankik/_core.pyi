@@ -96,7 +96,7 @@ def ik_sample_q7(
         list[np.array]: One IK solution. Empty if no solution was found. Array shape (7,).
     """
 
-__version__: str = "0.1"
+__version__: str = "1.0.0"
 kQDefault: numpy.ndarray  # value = array([ 0.        , -0.78539816,  0.        , -2.35619449,  0.        ,...
 q_max_fr3: list = [2.3093, 1.5133, 2.4937, -0.4461, 2.48, 4.2094, 2.6895]
 q_max_panda: list = [2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973]
