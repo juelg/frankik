@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.15)
 
 project(
     frankik
@@ -29,7 +29,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(FetchContent)
 
-find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
 
 
 FetchContent_Declare(pybind11

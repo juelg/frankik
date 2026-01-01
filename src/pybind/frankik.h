@@ -1,9 +1,9 @@
 #ifndef FRANKIK_H
 #define FRANKIK_H
 
+#include <Eigen/Eigen>
 #include <array>
 #include <cmath>
-#include <eigen3/Eigen/Eigen>
 #include <limits>
 
 namespace frankik {

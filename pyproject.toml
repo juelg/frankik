@@ -25,6 +25,13 @@ authors = [
 ]
 requires-python = ">=3.10"
 license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://github.com/juelg/frankik"
+Issues = "https://github.com/juelg/frankik/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -49,6 +56,7 @@ logging.level = "INFO"
 build-dir = "build"
 wheel.packages = ["src/frankik"]
 install.components = ["python_package"]
+cmake.build-type = "Release"
 
 [tool.black]
 line-length = 120
@@ -78,5 +86,5 @@ update_changelog_on_bump = true
 major_version_zero = true
 version_files = [
     "CMakeLists.txt:VERSION",
-    "python/frankik/_core/__init__.pyi:__version__",
+    "src/frankik/_core.pyi:__version__",
 ]
