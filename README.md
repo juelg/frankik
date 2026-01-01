@@ -18,10 +18,9 @@ print(q)
 
 ## Installation from source
 ```shell
-sudo apt install libeigen3-dev
 git clone https://github.com/juelg/frankik.git
 cd frankik
-pip install .
+pip install -v .
 ```
 ### Development installation
 ```shell

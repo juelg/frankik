@@ -29,17 +29,22 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(FetchContent)
 
-find_package(Eigen3 REQUIRED)
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 
 FetchContent_Declare(pybind11
     GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG v2.13.4
+    GIT_TAG v2.13.6
+    GIT_PROGRESS TRUE
+    EXCLUDE_FROM_ALL
+)
+FetchContent_Declare(Eigen3
+    GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+    GIT_TAG 3.4.1
     GIT_PROGRESS TRUE
     EXCLUDE_FROM_ALL
 )
 
-FetchContent_MakeAvailable(pybind11)
+FetchContent_MakeAvailable(pybind11 Eigen3)
 
 add_subdirectory(src)
