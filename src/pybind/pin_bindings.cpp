@@ -30,15 +30,16 @@ PYBIND11_MODULE(_pin, m) {
   py::class_<ClikParameters>(m, "ClikParameters",
                              "Parameters of the closed-loop IK iteration.")
       .def(py::init([](double eps, int max_iterations, double dt,
-                       double damping, bool clamp_joint_limits) {
-             return ClikParameters{eps, max_iterations, dt, damping,
-                                   clamp_joint_limits};
+                       double damping, bool clamp_joint_limits, int restarts) {
+             return ClikParameters{eps,     max_iterations,     dt,
+                                   damping, clamp_joint_limits, restarts};
            }),
            py::arg("eps") = ClikParameters().eps,
            py::arg("max_iterations") = ClikParameters().max_iterations,
            py::arg("dt") = ClikParameters().dt,
            py::arg("damping") = ClikParameters().damping,
-           py::arg("clamp_joint_limits") = ClikParameters().clamp_joint_limits)
+           py::arg("clamp_joint_limits") = ClikParameters().clamp_joint_limits,
+           py::arg("restarts") = ClikParameters().restarts)
       .def_readwrite("eps", &ClikParameters::eps,
                      "Convergence threshold on the SE(3) log error norm")
       .def_readwrite("max_iterations", &ClikParameters::max_iterations)
@@ -49,13 +50,17 @@ PYBIND11_MODULE(_pin, m) {
       .def_readwrite("clamp_joint_limits", &ClikParameters::clamp_joint_limits,
                      "Clamp the controlled joints to their limits after every "
                      "iteration")
+      .def_readwrite("restarts", &ClikParameters::restarts,
+                     "Retries from random configurations within the joint "
+                     "limits if the solver did not converge from q0")
       .def("__repr__", [](const ClikParameters& p) {
         return "ClikParameters(eps=" + std::to_string(p.eps) +
                ", max_iterations=" + std::to_string(p.max_iterations) +
                ", dt=" + std::to_string(p.dt) +
                ", damping=" + std::to_string(p.damping) +
                ", clamp_joint_limits=" +
-               (p.clamp_joint_limits ? "True" : "False") + ")";
+               (p.clamp_joint_limits ? "True" : "False") +
+               ", restarts=" + std::to_string(p.restarts) + ")";
       });
 
   py::class_<PinocchioKinematics>(

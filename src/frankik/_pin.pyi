@@ -24,7 +24,8 @@ class ClikParameters:
         max_iterations: int = 1000,
         dt: float = 0.1,
         damping: float = 1e-06,
-        clamp_joint_limits: bool = False,
+        clamp_joint_limits: bool = True,
+        restarts: int = 10,
     ) -> None: ...
     def __repr__(self) -> str: ...
     @property
@@ -59,6 +60,14 @@ class ClikParameters:
 
     @eps.setter
     def eps(self, arg0: float) -> None: ...
+    @property
+    def restarts(self) -> int:
+        """
+        Retries from random configurations within the joint limits if the solver did not converge from q0
+        """
+
+    @restarts.setter
+    def restarts(self, arg0: int) -> None: ...
 
 class ModelFormat:
     """
