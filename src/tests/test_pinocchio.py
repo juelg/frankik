@@ -104,7 +104,7 @@ def test_inverse_with_tcp_offset(robot_type):
     for _ in range(10):
         q = random_q(kin.q_min, kin.q_max)
         target = kin.forward(q, tcp_offset=tcp)
-        q_sol = kin.inverse(target, q0=kin.q_home, tcp_offset=tcp)
+        q_sol = kin.inverse(target, q0=q + np.random.uniform(-0.2, 0.2, size=kin.dof), tcp_offset=tcp)
         assert q_sol is not None
         assert_pose_close(kin.forward(q_sol, tcp_offset=tcp), target)
 
@@ -130,7 +130,7 @@ def test_solver_parameters():
     assert kin.parameters.max_iterations == 500
     assert kin.parameters.clamp_joint_limits is True
     assert kin.parameters.dt == 0.1
-    assert kin.parameters.restarts == 10
+    assert kin.parameters.restarts == 0
     assert PinocchioKinematics(RobotType.FR3, clamp_joint_limits=False).parameters.clamp_joint_limits is False
 
     params = kin.parameters
@@ -152,6 +152,15 @@ def test_solver_parameters():
         PinocchioKinematics(RobotType.FR3, foo=1)
     with pytest.raises(TypeError, match="either"):
         PinocchioKinematics(RobotType.FR3, parameters=params, eps=1e-3)
+
+
+def test_restarts_recover_from_bad_seed():
+    plain = PinocchioKinematics(RobotType.FR3)
+    restarting = PinocchioKinematics(RobotType.FR3, restarts=10)
+    bad_seed = np.array([0.0, 1.5, 0.0, -0.5, 0.0, 4.0, 0.0])
+    targets = [plain.forward(random_q(plain.q_min, plain.q_max)) for _ in range(20)]
+    assert any(plain.inverse(target, q0=bad_seed) is None for target in targets)
+    assert all(restarting.inverse(target, q0=bad_seed) is not None for target in targets)
 
 
 def test_q_home_override():
@@ -215,7 +224,7 @@ def test_custom_mjcf_dof_and_base_frame(mounted_fr3_with_finger):
         q = random_q(kin.q_min, kin.q_max)
         assert_pose_close(kin.forward(q), reference.forward(q), atol=1e-9)
         assert_pose_close(kin.forward(np.append(q, 0.02)), reference.forward(q), atol=1e-9)
-        q_sol = kin.inverse(reference.forward(q), q0=kin.q_home)
+        q_sol = kin.inverse(reference.forward(q), q0=q + np.random.uniform(-0.2, 0.2, size=7))
         assert q_sol is not None
         assert q_sol.shape == (7,)
         assert_pose_close(kin.forward(q_sol), reference.forward(q))
