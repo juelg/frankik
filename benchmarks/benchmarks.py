@@ -57,8 +57,6 @@ class FrankIK(Kinematics):
 
 
 class FrankIKPinocchio(Kinematics):
-    """Numerical solver of frankik (same CLIK algorithm as PinocchioCPP but bundled MJCF model)."""
-
     def __init__(self):
         self.frankik = PinocchioKinematics(RobotType.PANDA)
 

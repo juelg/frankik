@@ -6,8 +6,6 @@ requires = [
     "pybind11",
     "cmake",
     "ninja",
-    # Pinocchio (cmeel wheel) for the optional numerical solver. No wheels exist for Windows or PyPy, there the
-    # package is built without the `_pin` extension module.
     "pin==3.7.0; sys_platform != 'win32' and platform_python_implementation == 'CPython'",
 ]
 build-backend = "scikit_build_core.build"
@@ -37,16 +35,13 @@ Homepage = "https://github.com/juelg/frankik"
 Issues = "https://github.com/juelg/frankik/issues"
 
 [project.optional-dependencies]
-# Runtime dependencies of the Pinocchio based numerical solver (frankik.PinocchioKinematics).
-# The version must match the one the wheel was compiled against (see build-system.requires).
+# pin version must match build-system.requires, cmeel-* pins are needed by pin 3.7.0 at runtime
 pinocchio = [
     "pin==3.7.0",
-    # pin 3.7.0 resolves against older urdfdom/tinyxml SONAMEs at runtime
     "cmeel-urdfdom<5",
     "cmeel-tinyxml2<11",
 ]
 dev = [
-    # same as the `pinocchio` extra (listed explicitly as self-referencing extras need a recent pip)
     "pin==3.7.0",
     "cmeel-urdfdom<5",
     "cmeel-tinyxml2<11",
@@ -67,34 +62,28 @@ dev = [
 
 [tool.scikit-build]
 build.verbose = true
-# build all configured targets: _core (analytical) and, if pinocchio is available, _pin (numerical)
-build.targets = []
 logging.level = "INFO"
 build-dir = "build"
 wheel.packages = ["src/frankik"]
 install.components = ["python_package"]
 cmake.build-type = "Release"
 
+# pin ships manylinux_2_28 wheels for CPython on Linux and macOS >= 11 only. Its libraries are a runtime
+# dependency (frankik[pinocchio]) and therefore excluded from the wheel repair.
 [tool.cibuildwheel]
-# pin (Pinocchio) ships no wheels for PyPy or musllinux
 skip = ["pp*", "*-musllinux*"]
-# Fail the build if Pinocchio was not found instead of silently dropping the numerical solver.
 environment = { CMAKE_ARGS = "-DFRANKIK_WITH_PINOCCHIO=ON" }
 
 [tool.cibuildwheel.linux]
-# pin wheels are manylinux_2_28 only
 manylinux-x86_64-image = "manylinux_2_28"
 manylinux-aarch64-image = "manylinux_2_28"
-# Do not bundle the Pinocchio libraries, they are provided by the `pin` wheel at runtime (frankik[pinocchio]).
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libpinocchio_default.so.3.7.0 --exclude libpinocchio_parsers.so.3.7.0"
 
 [tool.cibuildwheel.macos]
-# the pinocchio wheels require macOS >= 11 (also needed for std::filesystem & co.)
 environment = { CMAKE_ARGS = "-DFRANKIK_WITH_PINOCCHIO=ON", MACOSX_DEPLOYMENT_TARGET = "11.0" }
 repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel} --exclude libpinocchio_default --exclude libpinocchio_parsers"
 
 [tool.cibuildwheel.windows]
-# No Pinocchio wheels for Windows: analytical solver only.
 environment = { CMAKE_ARGS = "-DFRANKIK_WITH_PINOCCHIO=OFF" }
 
 [tool.black]
