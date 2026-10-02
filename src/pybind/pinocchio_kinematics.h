@@ -31,7 +31,7 @@ struct ClikParameters {
   double dt = 1e-1;
   double damping = 1e-6;
   bool clamp_joint_limits = true;
-  int restarts = 10;
+  int restarts = 0;
 };
 
 // Forward kinematics and damped least squares closed-loop inverse kinematics

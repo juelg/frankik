@@ -51,7 +51,7 @@ kin = PinocchioKinematics(
     tcp_frame="tcp_site",       # MJCF site/body/joint used as end-effector frame
     base_frame="base_link",     # poses are expressed relative to this body (default: MJCF world frame)
     dof=6,                      # number of controlled joints (default: all joints of the model)
-    eps=1e-5, max_iterations=500, dt=0.1, damping=1e-6, clamp_joint_limits=True, restarts=10,
+    eps=1e-5, max_iterations=500, dt=0.1, damping=1e-6, clamp_joint_limits=True, restarts=0,
 )
 print(kin.joint_names, kin.frame_names, kin.q_min, kin.q_max, kin.reference_configurations)
 tcp = np.eye(4); tcp[2, 3] = 0.1  # optional tool offset (4x4) applied to `tcp_frame`

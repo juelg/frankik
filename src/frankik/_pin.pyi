@@ -25,7 +25,7 @@ class ClikParameters:
         dt: float = 0.1,
         damping: float = 1e-06,
         clamp_joint_limits: bool = True,
-        restarts: int = 10,
+        restarts: int = 0,
     ) -> None: ...
     def __repr__(self) -> str: ...
     @property
