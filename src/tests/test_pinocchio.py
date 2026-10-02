@@ -1,5 +1,3 @@
-"""Tests for the Pinocchio based numerical solver (frankik.PinocchioKinematics)."""
-
 import os
 from pathlib import Path
 
@@ -9,15 +7,12 @@ import pytest
 import frankik
 from frankik import FrankaKinematics, Kinematics, PinocchioKinematics, RobotType
 
-# When pinocchio is not installed the numerical solver is unavailable and these tests are skipped.
-# CI sets FRANKIK_REQUIRE_PINOCCHIO=1 so that a silently missing `_pin` module fails the pipeline.
 pytestmark = pytest.mark.skipif(
     not frankik.has_pinocchio() and not os.environ.get("FRANKIK_REQUIRE_PINOCCHIO"),
     reason="pinocchio is not installed (pip install 'frankik[pinocchio]')",
 )
 
 N_SAMPLES = 50
-# Pose tolerance for IK round trips, the solver converges to a log6 error < 1e-4
 CARTESIAN_TOL = 1e-3
 
 
@@ -27,7 +22,6 @@ def _set_seed():
 
 
 def random_q(q_min: np.ndarray, q_max: np.ndarray, margin: float = 0.1) -> np.ndarray:
-    """Uniform random configuration within the central part of the joint range."""
     span = q_max - q_min
     return q_min + margin * span + np.random.rand(len(q_min)) * (1 - 2 * margin) * span  # type: ignore
 
@@ -36,9 +30,6 @@ def assert_pose_close(a: np.ndarray, b: np.ndarray, atol: float = CARTESIAN_TOL,
     np.testing.assert_allclose(a, b, atol=atol, err_msg=msg)
 
 
-# --------------------------------------------------------------------------------------------------
-# bundled models
-# --------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize("robot_type", list(RobotType))
 def test_bundled_model_description(robot_type):
     description = robot_type.description
@@ -72,23 +63,20 @@ def test_robot_type_from_string():
     kin = PinocchioKinematics("fr3")
     assert kin.robot_type == RobotType.FR3
     assert FrankaKinematics("panda").robot_type == RobotType.PANDA
-    assert RobotType.FR3 == "fr3"  # backwards compatibility with frankik 1.x string constants
+    assert RobotType.FR3 == "fr3"
 
 
 @pytest.mark.parametrize("robot_type", list(RobotType))
 def test_forward_matches_analytical_solver(robot_type):
-    """The bundled attachment_site is the Franka flange frame. The analytical solver returns the
-    Franka Hand TCP, i.e. flange * FrankaHandTCPOffset."""
+    """The bundled attachment_site is the flange, the analytical solver returns flange * FrankaHandTCPOffset."""
     kin = PinocchioKinematics(robot_type)
     ana = FrankaKinematics(robot_type)
-    # stay within the (more conservative) libfranka limits of the analytical solver
     q_min = np.maximum(kin.q_min, ana.q_min)
     q_max = np.minimum(kin.q_max, ana.q_max)
     for _ in range(N_SAMPLES):
         q = random_q(q_min, q_max)
         pose_pin = kin.forward(q, tcp_offset=FrankaKinematics.FrankaHandTCPOffset)
         pose_ana = ana.forward(q)
-        # FrankaHandTCPOffset uses rounded 0.707 entries, hence the tolerance
         assert_pose_close(pose_pin, pose_ana, atol=1e-3, msg=f"q={q}")
 
 
@@ -132,7 +120,7 @@ def test_inverse_default_seed_is_q_home():
 def test_inverse_unreachable_returns_none():
     kin = PinocchioKinematics(RobotType.FR3, max_iterations=100)
     target = np.eye(4)
-    target[:3, 3] = [3.0, 0.0, 0.0]  # far outside the workspace
+    target[:3, 3] = [3.0, 0.0, 0.0]
     assert kin.inverse(target) is None
 
 
@@ -141,7 +129,7 @@ def test_solver_parameters():
     assert kin.parameters.eps == 1e-6
     assert kin.parameters.max_iterations == 500
     assert kin.parameters.clamp_joint_limits is True
-    assert kin.parameters.dt == 0.1  # default
+    assert kin.parameters.dt == 0.1
 
     params = kin.parameters
     params.damping = 1e-3
@@ -150,7 +138,6 @@ def test_solver_parameters():
     assert kin.parameters.damping == 1e-3
     assert kin.parameters.max_iterations == 1000
 
-    # tighter eps -> tighter pose accuracy; clamping keeps the solution within the limits
     for _ in range(10):
         q = random_q(kin.q_min, kin.q_max)
         target = kin.forward(q)
@@ -159,8 +146,10 @@ def test_solver_parameters():
         assert np.all(q_sol >= kin.q_min - 1e-9) and np.all(q_sol <= kin.q_max + 1e-9)
         assert_pose_close(kin.forward(q_sol), target, atol=1e-5)
 
-    with pytest.raises(TypeError, match="Unknown solver parameter"):
+    with pytest.raises(TypeError):
         PinocchioKinematics(RobotType.FR3, foo=1)
+    with pytest.raises(TypeError, match="either"):
+        PinocchioKinematics(RobotType.FR3, parameters=params, eps=1e-3)
 
 
 def test_q_home_override():
@@ -171,14 +160,11 @@ def test_q_home_override():
     np.testing.assert_allclose(kin.q_home, frankik.Q_HOME_FRANKA)
 
 
-# --------------------------------------------------------------------------------------------------
-# custom robot descriptions
-# --------------------------------------------------------------------------------------------------
 @pytest.fixture()
 def mounted_fr3_with_finger(tmp_path: Path) -> Path:
-    """FR3 mounted with an offset in the world plus an additional (uncontrolled) slide joint."""
+    """FR3 mounted with an offset below an intermediate body (Pinocchio ignores the root body pose) plus an
+    uncontrolled slide joint."""
     xml = RobotType.FR3.mjcf_path.read_text()
-    # Pinocchio ignores pos/quat of the root body of the worldbody, hence the intermediate "table" body
     mount = (
         '<body name="table">\n'
         '<body name="mount" pos="0.5 0.2 0.1" quat="0.7071068 0 0 0.7071068">\n'
@@ -220,15 +206,12 @@ def test_custom_mjcf_dof_and_base_frame(mounted_fr3_with_finger):
     assert kin.joint_names[-1] == "finger_joint"
     assert kin.q_min.shape == (7,)
     assert kin.reference_configurations["home"].shape == (7,)
-    # q_home defaults to the MJCF home keyframe for custom models
     np.testing.assert_allclose(kin.q_home, kin.reference_configurations["home"])
     assert kin.path == mounted_fr3_with_finger
 
     for _ in range(10):
         q = random_q(kin.q_min, kin.q_max)
-        # poses relative to the base frame are independent of the mounting pose
         assert_pose_close(kin.forward(q), reference.forward(q), atol=1e-9)
-        # full configuration vectors are accepted as well
         assert_pose_close(kin.forward(np.append(q, 0.02)), reference.forward(q), atol=1e-9)
         q_sol = kin.inverse(reference.forward(q), q0=kin.q_home)
         assert q_sol is not None
@@ -241,7 +224,7 @@ def test_custom_mjcf_world_frame(mounted_fr3_with_finger):
     reference = PinocchioKinematics(RobotType.FR3)
     assert kin.base_frame is None
     mount = np.eye(4)
-    mount[:3, :3] = [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]  # 90 deg about z
+    mount[:3, :3] = [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
     mount[:3, 3] = [0.5, 0.2, 0.1]
     q = random_q(kin.q_min, kin.q_max)
     assert_pose_close(kin.forward(q), mount @ reference.forward(q), atol=1e-6)
@@ -259,10 +242,8 @@ def test_custom_mjcf_uncontrolled_joint_and_q_rest(mounted_fr3_with_finger):
     kin.q_rest = q_rest
     np.testing.assert_allclose(kin.q_rest, q_rest)
     pose_open = kin.forward(q)
-    # the finger joint slides along the local y axis of the finger body
     assert not np.allclose(pose_closed, pose_open)
     np.testing.assert_allclose(np.linalg.norm(pose_open[:3, 3] - pose_closed[:3, 3]), 0.04, atol=1e-9)
-    # inverse never moves the uncontrolled joint and returns dof values
     q_sol = kin.inverse(pose_open, q0=kin.q_home)
     assert q_sol is not None
     assert q_sol.shape == (7,)
@@ -303,21 +284,16 @@ def test_urdf_model(tmp_path: Path):
     assert kin.dof == 1
     pose = kin.forward(np.array([np.pi / 2]))
     np.testing.assert_allclose(pose[:3, 3], [0.0, 1.0, 0.0], atol=1e-9)
-    # explicit format selection
     kin2 = PinocchioKinematics(str(path), tcp_frame="tool", model_format="urdf")
     assert_pose_close(kin2.forward(np.array([0.3])), kin.forward(np.array([0.3])), atol=1e-12)
     with pytest.raises(ValueError, match="Unknown model format"):
         PinocchioKinematics(path, tcp_frame="tool", model_format="sdf")
 
 
-# --------------------------------------------------------------------------------------------------
-# error handling
-# --------------------------------------------------------------------------------------------------
 def test_errors():
     with pytest.raises(ValueError, match="does not exist"):
         PinocchioKinematics("/does/not/exist.xml", tcp_frame="x")
     with pytest.raises(ValueError, match="attachment_site"):
-        # error message lists the available frames
         PinocchioKinematics(RobotType.FR3, tcp_frame="not_a_frame")
     with pytest.raises(ValueError, match="base_frame"):
         PinocchioKinematics(RobotType.FR3, base_frame="not_a_frame")
@@ -326,5 +302,5 @@ def test_errors():
     kin = PinocchioKinematics(RobotType.FR3)
     with pytest.raises(ValueError, match="dof=7"):
         kin.forward(np.zeros(3))
-    with pytest.raises(TypeError, match="Unknown keyword"):
-        kin.inverse(np.eye(4), q7=0.0)
+    with pytest.raises(TypeError, match="q7"):
+        kin.inverse(np.eye(4), q7=0.0)  # type: ignore[call-arg]

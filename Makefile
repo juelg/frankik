@@ -1,7 +1,6 @@
 PYSRC = src
 CPPSRC = src
 COMPILE_MODE = Release
-# AUTO: build the Pinocchio numerical solver if the `pin` wheel is installed, ON: require it, OFF: skip it
 WITH_PINOCCHIO = AUTO
 
 # CPP
@@ -26,7 +25,6 @@ clangcompile:
 # Auto generation of CPP binding stub files
 stubgen:
 	pybind11-stubgen -o src --numpy-array-use-type-var frankik
-	# _pin is imported lazily and therefore not discovered via the package, generate its stub explicitly (if built)
 	if python -c 'import frankik._pin' 2>/dev/null; then pybind11-stubgen -o src --numpy-array-use-type-var frankik._pin; fi
 	find ./src -name '*.pyi' -print | xargs sed -i '1s/^/# ATTENTION: auto generated from C++ code, use `make stubgen` to update!\n/'
 	find ./src -not -path "./src/frankik/_core.pyi" -not -path "./src/frankik/_pin.pyi" -name '*.pyi' -delete

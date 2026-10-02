@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-      - name: Install Pinocchio (cmeel wheel) for the numerical solver
+      - name: Install Pinocchio
         run: python -m pip install "pin==3.7.0" "cmeel-urdfdom<5" "cmeel-tinyxml2<11"
       - name: Check clang format
         run: make cppcheckformat
@@ -35,7 +35,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # fail the build instead of silently dropping the Pinocchio module
       CMAKE_ARGS: -DFRANKIK_WITH_PINOCCHIO=ON
       FRANKIK_REQUIRE_PINOCCHIO: "1"
     steps:
@@ -57,7 +56,6 @@ jobs:
         run: make pytest
 
   pythonpackage_without_pinocchio:
-    # the analytical solver must keep working without the optional pinocchio dependency (e.g. on Windows)
     runs-on: ubuntu-latest
     env:
       CMAKE_ARGS: -DFRANKIK_WITH_PINOCCHIO=OFF
@@ -70,7 +68,7 @@ jobs:
           cache: "pip"
       - name: Install the package
         run: python -m pip install . pytest scipy
-      - name: Ensure the numerical solver reports itself as unavailable
+      - name: Check that the numerical solver is unavailable
         run: |
           python -c "import frankik, sys; sys.exit(0 if not frankik.has_pinocchio() else 'pinocchio should not be available')"
       - name: Ensure all unittests(pytest) are passing
