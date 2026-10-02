@@ -2,8 +2,10 @@
 #define FRANKIK_PINOCCHIO_KINEMATICS_H
 
 #include <Eigen/Eigen>
+#include <cmath>
 #include <map>
 #include <optional>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -28,7 +30,8 @@ struct ClikParameters {
   int max_iterations = 1000;
   double dt = 1e-1;
   double damping = 1e-6;
-  bool clamp_joint_limits = false;
+  bool clamp_joint_limits = true;
+  int restarts = 10;
 };
 
 // Forward kinematics and damped least squares closed-loop inverse kinematics
@@ -92,31 +95,13 @@ class PinocchioKinematics {
       target = target * to_se3(*tcp_offset).inverse();
     }
     Eigen::VectorXd q = full_configuration(q0);
-    pinocchio::Data::Matrix6x J = pinocchio::Data::Matrix6x::Zero(6, model_.nv);
-    pinocchio::Data::Matrix6 Jlog;
-    pinocchio::Data::Matrix6 JJt;
-    Eigen::VectorXd v(model_.nv);
-    for (int i = 0; i <= parameters_.max_iterations; ++i) {
-      pinocchio::forwardKinematics(model_, data_, q);
-      pinocchio::updateFramePlacements(model_, data_);
-      const pinocchio::SE3 iMd =
-          data_.oMf[tcp_frame_id_].actInv(base_placement() * target);
-      const pinocchio::Motion::Vector6 err = pinocchio::log6(iMd).toVector();
-      if (err.norm() < parameters_.eps) {
-        return Eigen::VectorXd(q.head(dof_));
+    std::mt19937 rng(0);
+    for (int attempt = 0; attempt <= parameters_.restarts; ++attempt) {
+      if (attempt > 0) {
+        q.head(dof_) = random_configuration(q.head(dof_), rng);
       }
-      pinocchio::computeFrameJacobian(model_, data_, q, tcp_frame_id_, J);
-      pinocchio::Jlog6(iMd.inverse(), Jlog);
-      J = -Jlog * J;
-      J.rightCols(model_.nv - dof_).setZero();
-      JJt.noalias() = J * J.transpose();
-      JJt.diagonal().array() += parameters_.damping;
-      v.noalias() = -J.transpose() * JJt.ldlt().solve(err);
-      q = pinocchio::integrate(model_, q, v * parameters_.dt);
-      if (parameters_.clamp_joint_limits) {
-        q.head(dof_) = q.head(dof_)
-                           .cwiseMax(model_.lowerPositionLimit.head(dof_))
-                           .cwiseMin(model_.upperPositionLimit.head(dof_));
+      if (const auto solution = solve(target, q)) {
+        return solution;
       }
     }
     return std::nullopt;
@@ -166,6 +151,55 @@ class PinocchioKinematics {
   }
 
  private:
+  std::optional<Eigen::VectorXd> solve(const pinocchio::SE3& target,
+                                       Eigen::VectorXd q) {
+    const auto q_min = model_.lowerPositionLimit.head(dof_);
+    const auto q_max = model_.upperPositionLimit.head(dof_);
+    pinocchio::Data::Matrix6x J = pinocchio::Data::Matrix6x::Zero(6, model_.nv);
+    pinocchio::Data::Matrix6 Jlog;
+    pinocchio::Data::Matrix6 JJt;
+    Eigen::VectorXd v(model_.nv);
+    for (int i = 0; i <= parameters_.max_iterations; ++i) {
+      pinocchio::forwardKinematics(model_, data_, q);
+      pinocchio::updateFramePlacements(model_, data_);
+      const pinocchio::SE3 iMd =
+          data_.oMf[tcp_frame_id_].actInv(base_placement() * target);
+      const pinocchio::Motion::Vector6 err = pinocchio::log6(iMd).toVector();
+      if (err.norm() < parameters_.eps) {
+        return Eigen::VectorXd(q.head(dof_));
+      }
+      pinocchio::computeFrameJacobian(model_, data_, q, tcp_frame_id_, J);
+      pinocchio::Jlog6(iMd.inverse(), Jlog);
+      J = -Jlog * J;
+      J.rightCols(model_.nv - dof_).setZero();
+      JJt.noalias() = J * J.transpose();
+      JJt.diagonal().array() += parameters_.damping;
+      v.noalias() = -J.transpose() * JJt.ldlt().solve(err);
+      q = pinocchio::integrate(model_, q, v * parameters_.dt);
+      if (parameters_.clamp_joint_limits) {
+        q.head(dof_) = q.head(dof_).cwiseMax(q_min).cwiseMin(q_max);
+      }
+    }
+    return std::nullopt;
+  }
+
+  // Uniform sample within the joint limits, within +-pi around q for
+  // unlimited joints.
+  Eigen::VectorXd random_configuration(const Eigen::VectorXd& q,
+                                       std::mt19937& rng) const {
+    Eigen::VectorXd sample(dof_);
+    for (int j = 0; j < dof_; ++j) {
+      double lower = model_.lowerPositionLimit[j];
+      double upper = model_.upperPositionLimit[j];
+      if (!std::isfinite(lower) || !std::isfinite(upper)) {
+        lower = q[j] - M_PI;
+        upper = q[j] + M_PI;
+      }
+      sample[j] = std::uniform_real_distribution<double>(lower, upper)(rng);
+    }
+    return sample;
+  }
+
   static pinocchio::SE3 to_se3(const Eigen::Matrix4d& T) {
     return {T.topLeftCorner<3, 3>(), T.topRightCorner<3, 1>()};
   }

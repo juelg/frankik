@@ -125,11 +125,13 @@ def test_inverse_unreachable_returns_none():
 
 
 def test_solver_parameters():
-    kin = PinocchioKinematics(RobotType.FR3, eps=1e-6, max_iterations=500, clamp_joint_limits=True)
+    kin = PinocchioKinematics(RobotType.FR3, eps=1e-6, max_iterations=500)
     assert kin.parameters.eps == 1e-6
     assert kin.parameters.max_iterations == 500
     assert kin.parameters.clamp_joint_limits is True
     assert kin.parameters.dt == 0.1
+    assert kin.parameters.restarts == 10
+    assert PinocchioKinematics(RobotType.FR3, clamp_joint_limits=False).parameters.clamp_joint_limits is False
 
     params = kin.parameters
     params.damping = 1e-3
@@ -262,32 +264,32 @@ def test_body_as_tcp_frame(mounted_fr3_with_finger):
     assert_pose_close(kin.forward(q, tcp_offset=flange_offset), site.forward(q), atol=1e-9)
 
 
-def test_urdf_model(tmp_path: Path):
-    urdf = """<?xml version="1.0"?>
-<robot name="planar">
-  <link name="base_link"/>
-  <link name="link1"><inertial><mass value="1"/><inertia ixx="1" iyy="1" izz="1" ixy="0" ixz="0" iyz="0"/></inertial></link>
-  <link name="tool"/>
-  <joint name="joint1" type="revolute">
-    <parent link="base_link"/><child link="link1"/>
-    <axis xyz="0 0 1"/><limit lower="-3" upper="3" effort="1" velocity="1"/>
-  </joint>
-  <joint name="tool_joint" type="fixed">
-    <parent link="link1"/><child link="tool"/>
-    <origin xyz="1 0 0" rpy="0 0 0"/>
-  </joint>
-</robot>
-"""
-    path = tmp_path / "planar.urdf"
-    path.write_text(urdf)
-    kin = PinocchioKinematics(path, tcp_frame="tool")
-    assert kin.dof == 1
-    pose = kin.forward(np.array([np.pi / 2]))
-    np.testing.assert_allclose(pose[:3, 3], [0.0, 1.0, 0.0], atol=1e-9)
-    kin2 = PinocchioKinematics(str(path), tcp_frame="tool", model_format="urdf")
-    assert_pose_close(kin2.forward(np.array([0.3])), kin.forward(np.array([0.3])), atol=1e-12)
+FR3_URDF = Path(__file__).parent / "data" / "fr3.urdf"
+
+
+def test_urdf_matches_mjcf():
+    urdf = PinocchioKinematics(FR3_URDF, tcp_frame="fr3_link8", base_frame="fr3_link0")
+    mjcf = PinocchioKinematics(RobotType.FR3)
+    assert urdf.dof == 7
+    assert urdf.joint_names == mjcf.joint_names
+    np.testing.assert_allclose(urdf.q_min, frankik.q_min_fr3)
+    np.testing.assert_allclose(urdf.q_max, frankik.q_max_fr3)
+    for _ in range(N_SAMPLES):
+        q = random_q(urdf.q_min, urdf.q_max)
+        target = mjcf.forward(q)
+        assert_pose_close(urdf.forward(q), target, atol=1e-9)
+        q_sol = urdf.inverse(target, q0=q + np.random.uniform(-0.2, 0.2, size=7))
+        assert q_sol is not None
+        assert_pose_close(urdf.forward(q_sol), target)
+
+
+def test_model_format_selection():
+    auto = PinocchioKinematics(FR3_URDF, tcp_frame="fr3_link8")
+    explicit = PinocchioKinematics(str(FR3_URDF), tcp_frame="fr3_link8", model_format="urdf")
+    q = random_q(auto.q_min, auto.q_max)
+    assert_pose_close(auto.forward(q), explicit.forward(q), atol=1e-12)
     with pytest.raises(ValueError, match="Unknown model format"):
-        PinocchioKinematics(path, tcp_frame="tool", model_format="sdf")
+        PinocchioKinematics(FR3_URDF, tcp_frame="fr3_link8", model_format="sdf")
 
 
 def test_errors():

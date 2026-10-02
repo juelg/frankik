@@ -260,7 +260,7 @@ class PinocchioKinematics(Kinematics):
             q_home: Default IK seed. Defaults to the MJCF ``home`` keyframe or the neutral configuration.
             model_format: ``"auto"`` (by file extension), ``"mjcf"`` or ``"urdf"``.
             parameters: Solver parameters, alternatively given as keyword arguments
-                (``eps``, ``max_iterations``, ``dt``, ``damping``, ``clamp_joint_limits``).
+                (``eps``, ``max_iterations``, ``dt``, ``damping``, ``clamp_joint_limits``, ``restarts``).
         """
         pin = _load_pin()
         self.robot_type = self._as_robot_type(model)
