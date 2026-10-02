@@ -31,9 +31,7 @@ add_compile_definitions(_USE_MATH_DEFINES)
 
 include(FetchContent)
 
-# Numerical solver backed by Pinocchio: AUTO builds it when the `pin` wheel is
-# installed, ON fails if it is missing, OFF never builds it.
-set(FRANKIK_WITH_PINOCCHIO "AUTO" CACHE STRING "Build the Pinocchio based numerical solver (AUTO/ON/OFF)")
+set(FRANKIK_WITH_PINOCCHIO "AUTO" CACHE STRING "Build the Pinocchio based numerical solver: AUTO (if pin is installed), ON, OFF")
 set_property(CACHE FRANKIK_WITH_PINOCCHIO PROPERTY STRINGS AUTO ON OFF)
 
 find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)

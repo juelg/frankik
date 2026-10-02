@@ -26,8 +26,6 @@ jobs:
           platforms: all
 
       - name: Build wheels
-        # Pinocchio specific settings (manylinux_2_28 images, excluded libraries, no pinocchio on Windows)
-        # live in [tool.cibuildwheel] of pyproject.toml
         uses: pypa/cibuildwheel@v2.22.0
         env:
           # Configure cibuildwheel to build for x86_64 and arm64 (Apple Silicon / Raspberry Pi)
