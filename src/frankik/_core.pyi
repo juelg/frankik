@@ -2,6 +2,7 @@
 """
 Python bindings for frankik IK/FK
 """
+
 from __future__ import annotations
 
 import typing
@@ -21,7 +22,7 @@ __all__: list[str] = [
 ]
 
 def fk(
-    q: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]]
+    q: numpy.ndarray[tuple[typing.Literal[7]], numpy.dtype[numpy.float64]],
 ) -> numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]]:
     """
     Compute forward kinematics for Franka robot.

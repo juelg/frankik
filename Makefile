@@ -1,6 +1,8 @@
 PYSRC = src
 CPPSRC = src
 COMPILE_MODE = Release
+# AUTO: build the Pinocchio numerical solver if the `pin` wheel is installed, ON: require it, OFF: skip it
+WITH_PINOCCHIO = AUTO
 
 # CPP
 cppcheckformat:
@@ -14,23 +16,25 @@ cpplint:
 
 
 gcccompile: 
-	cmake -DCMAKE_BUILD_TYPE=${COMPILE_MODE} -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -B build -G Ninja
-	cmake --build build --target _core
+	cmake -DCMAKE_BUILD_TYPE=${COMPILE_MODE} -DFRANKIK_WITH_PINOCCHIO=${WITH_PINOCCHIO} -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -B build -G Ninja
+	cmake --build build
 
 clangcompile: 
-	cmake -DCMAKE_BUILD_TYPE=${COMPILE_MODE} -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -B build -G Ninja
-	cmake --build build --target _core
+	cmake -DCMAKE_BUILD_TYPE=${COMPILE_MODE} -DFRANKIK_WITH_PINOCCHIO=${WITH_PINOCCHIO} -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -B build -G Ninja
+	cmake --build build
 
 # Auto generation of CPP binding stub files
 stubgen:
 	pybind11-stubgen -o src --numpy-array-use-type-var frankik
+	# _pin is imported lazily and therefore not discovered via the package, generate its stub explicitly (if built)
+	if python -c 'import frankik._pin' 2>/dev/null; then pybind11-stubgen -o src --numpy-array-use-type-var frankik._pin; fi
 	find ./src -name '*.pyi' -print | xargs sed -i '1s/^/# ATTENTION: auto generated from C++ code, use `make stubgen` to update!\n/'
-	find ./src -not -path "./src/frankik/_core.pyi" -name '*.pyi' -delete
-	find ./src/frankik/_core.pyi -name '*.pyi' -print | xargs sed -i 's/tuple\[typing\.Literal\[\([0-9]\+\)\], typing\.Literal\[1\]\]/tuple\[typing\.Literal[\1]\]/g'
-	find ./src/frankik/_core.pyi -name '*.pyi' -print | xargs sed -i 's/tuple\[\([M|N]\), typing\.Literal\[1\]\]/tuple\[\1\]/g'
-	ruff check --fix src/frankik/_core.pyi
-	isort src/frankik/_core.pyi
-	black src/frankik/_core.pyi
+	find ./src -not -path "./src/frankik/_core.pyi" -not -path "./src/frankik/_pin.pyi" -name '*.pyi' -delete
+	find ./src/frankik -name '_*.pyi' -print | xargs sed -i 's/tuple\[typing\.Literal\[\([0-9]\+\)\], typing\.Literal\[1\]\]/tuple\[typing\.Literal[\1]\]/g'
+	find ./src/frankik -name '_*.pyi' -print | xargs sed -i 's/tuple\[\([M|N]\), typing\.Literal\[1\]\]/tuple\[\1\]/g'
+	ruff check --fix src/frankik/*.pyi
+	isort src/frankik/*.pyi
+	black src/frankik/*.pyi
 
 
 # Python
