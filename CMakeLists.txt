@@ -9,6 +9,7 @@ project(
 
 
 cmake_policy(SET CMP0048 NEW) # Set version in project
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 # Allow target properties affecting visibility during linking in static libraries
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 cmake_policy(SET CMP0135 NEW) # Use timestamp of file extraction not download
@@ -29,6 +30,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_compile_definitions(_USE_MATH_DEFINES)
 
 include(FetchContent)
+
+set(FRANKIK_WITH_PINOCCHIO "AUTO" CACHE STRING "Build the Pinocchio based numerical solver: AUTO (if pin is installed), ON, OFF")
+set_property(CACHE FRANKIK_WITH_PINOCCHIO PROPERTY STRINGS AUTO ON OFF)
 
 find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
 

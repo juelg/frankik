@@ -8,7 +8,7 @@ import rcs
 import rcs_robotics_library
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
-from frankik import FrankaKinematics
+from frankik import FrankaKinematics, PinocchioKinematics, RobotType
 
 
 class Kinematics:
@@ -54,6 +54,17 @@ class FrankIK(Kinematics):
 
     def inverse(self, pose, q0=None):
         return self.frankik.inverse(pose, q0=q0, q7=np.pi/4)
+
+
+class FrankIKPinocchio(Kinematics):
+    def __init__(self):
+        self.frankik = PinocchioKinematics(RobotType.PANDA)
+
+    def forward(self, q0):
+        return self.frankik.forward(q0)
+
+    def inverse(self, pose, q0=None):
+        return self.frankik.inverse(pose, q0=q0)
 
 
 class PinocchioCPP(Kinematics):
@@ -297,6 +308,7 @@ def benchmark_all():
         (FrankIK, 1000),
         (RoboticstoolboxPython, 1000),  # numpy version needs to be below 2.0
         (FastIK, 1000),
+        (FrankIKPinocchio, 1000),
         (PinocchioCPP, 1000),
         (RoboticsLibrary, 1000),
         (ManipulaPy, 1000),

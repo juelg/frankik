@@ -9,6 +9,10 @@ Existing libraries often rely on slow, generic numerical solvers, demand complex
 `frankik` is specialized for the Franka robot (supports both Panda and FR3) and easy to install via pip.
 Its IK solver is almost twice as fast as the fastest alternative Python library; see [Benchmarks](#speed-benchmark).
 
+Since version 2, `frankik` additionally ships a generic **numerical solver** (`PinocchioKinematics`) based on
+[Pinocchio](https://github.com/stack-of-tasks/pinocchio) that works with any robot described by a MuJoCo MJCF (or URDF) file,
+see [Numerical solver for arbitrary robots](#numerical-solver-for-arbitrary-robots-pinocchio).
+
 ## Example
 ```python
 import numpy as np
@@ -21,9 +25,50 @@ assert np.allclose(q, q_home)
 print(q)
 ```
 
+## Numerical Solver for Arbitrary Robots (Pinocchio)
+`PinocchioKinematics` is a damped least squares closed-loop inverse kinematics (CLIK) solver built on Pinocchio, the same
+algorithm that is used in the [Robot Control Stack](https://github.com/RobotControlStack/robot-control-stack).
+Its IK is roughly 10-25x slower than the analytical solver with a fixed `q7` (2x compared to `q7` sampling, more from a seed far away from the solution), forward kinematics is equally fast, and it works for any serial kinematic chain.
+Both solvers share the `frankik.Kinematics` interface (`forward`, `inverse`, `dof`, `q_min`, `q_max`, `q_home`) and can be used interchangeably.
+
+Kinematics-only versions of the [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) Panda and FR3 models are bundled
+(see [`src/frankik/models`](src/frankik/models/README.md)) and selected via `RobotType`:
+```python
+import numpy as np
+from frankik import PinocchioKinematics, RobotType
+
+kin = PinocchioKinematics(RobotType.FR3)  # or RobotType.PANDA
+pose = kin.forward(kin.q_home)  # pose of the flange (`attachment_site`) relative to the robot base
+q = kin.inverse(pose, q0=kin.q_home)
+assert q is not None and np.allclose(kin.forward(q), pose, atol=1e-3)
+```
+Any other robot can be used by pointing to its MJCF file and naming the end-effector site (or body/joint) and optionally the base body,
+the number of controlled joints (`dof`, the first `dof` configuration variables; remaining joints such as gripper fingers are held fixed)
+and the solver parameters:
+```python
+kin = PinocchioKinematics(
+    "path/to/robot.xml",
+    tcp_frame="tcp_site",       # MJCF site/body/joint used as end-effector frame
+    base_frame="base_link",     # poses are expressed relative to this body (default: MJCF world frame)
+    dof=6,                      # number of controlled joints (default: all joints of the model)
+    eps=1e-5, max_iterations=500, dt=0.1, damping=1e-6, clamp_joint_limits=True, restarts=0,
+)
+print(kin.joint_names, kin.frame_names, kin.q_min, kin.q_max, kin.reference_configurations)
+tcp = np.eye(4); tcp[2, 3] = 0.1  # optional tool offset (4x4) applied to `tcp_frame`
+pose = kin.forward(kin.q_home, tcp_offset=tcp)
+q = kin.inverse(pose, q0=kin.q_home, tcp_offset=tcp)  # None if the solver did not converge
+```
+The numerical solver requires the optional Pinocchio dependency (pulled from the [`pin`](https://pypi.org/project/pin/) wheel, Linux and macOS only):
+```shell
+pip install 'frankik[pinocchio]'
+```
+`frankik.has_pinocchio()` tells whether the numerical solver is available in the current environment.
+
 ## Installation from PyPI (Recommended)
 ```shell
 pip install frankik
+# with the numerical Pinocchio solver
+pip install 'frankik[pinocchio]'
 ```
 
 ## Installation from Source
@@ -32,6 +77,9 @@ git clone https://github.com/juelg/frankik.git
 cd frankik
 pip install -v .
 ```
+The Pinocchio module is built automatically if the `pin` wheel is installed in the build environment
+(it is part of the build requirements on Linux/macOS). Set `CMAKE_ARGS=-DFRANKIK_WITH_PINOCCHIO=ON|OFF|AUTO`
+to force or skip it (`make gcccompile WITH_PINOCCHIO=OFF` for plain CMake builds).
 ### Development Installation
 ```shell
 pip install -ve '.[dev]'

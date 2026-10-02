@@ -6,13 +6,14 @@ requires = [
     "pybind11",
     "cmake",
     "ninja",
+    "pin==3.7.0; sys_platform != 'win32' and platform_python_implementation == 'CPython'",
 ]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "frankik"
 version = "1.0.0"
-description="Standalone blazing fast, analytical inverse kinematics for Franka Panda and FR3 robots."
+description = "Standalone blazing fast, analytical inverse kinematics for Franka Panda and FR3 robots plus a generic numerical (Pinocchio) solver for any MJCF robot."
 readme = "README.md"
 dependencies = [
     "numpy",
@@ -34,7 +35,16 @@ Homepage = "https://github.com/juelg/frankik"
 Issues = "https://github.com/juelg/frankik/issues"
 
 [project.optional-dependencies]
+# pin version must match build-system.requires, cmeel-* pins are needed by pin 3.7.0 at runtime
+pinocchio = [
+    "pin==3.7.0",
+    "cmeel-urdfdom<5",
+    "cmeel-tinyxml2<11",
+]
 dev = [
+    "pin==3.7.0",
+    "cmeel-urdfdom<5",
+    "cmeel-tinyxml2<11",
     "ruff==0.3.2",
     "black==24.1.1",
     "isort==5.13.2",
@@ -47,16 +57,34 @@ dev = [
     "clang-format",
     "clang-tidy",
     "scipy",
+    "mujoco",
 ]
 
 [tool.scikit-build]
 build.verbose = true
-build.targets = ["_core"]
 logging.level = "INFO"
 build-dir = "build"
 wheel.packages = ["src/frankik"]
 install.components = ["python_package"]
 cmake.build-type = "Release"
+
+# pin ships manylinux_2_28 wheels for CPython on Linux and macOS >= 11 only. Its libraries are a runtime
+# dependency (frankik[pinocchio]) and therefore excluded from the wheel repair.
+[tool.cibuildwheel]
+skip = ["pp*", "*-musllinux*"]
+environment = { CMAKE_ARGS = "-DFRANKIK_WITH_PINOCCHIO=ON" }
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel} --exclude libpinocchio_default.so.3.7.0 --exclude libpinocchio_parsers.so.3.7.0"
+
+[tool.cibuildwheel.macos]
+environment = { CMAKE_ARGS = "-DFRANKIK_WITH_PINOCCHIO=ON", MACOSX_DEPLOYMENT_TARGET = "11.0" }
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel} --exclude libpinocchio_default --exclude libpinocchio_parsers"
+
+[tool.cibuildwheel.windows]
+environment = { CMAKE_ARGS = "-DFRANKIK_WITH_PINOCCHIO=OFF" }
 
 [tool.black]
 line-length = 120
@@ -87,4 +115,5 @@ major_version_zero = true
 version_files = [
     "CMakeLists.txt:VERSION",
     "src/frankik/_core.pyi:__version__",
+    "src/frankik/_pin.pyi:__version__",
 ]
