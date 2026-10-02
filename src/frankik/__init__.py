@@ -228,7 +228,8 @@ def has_pinocchio() -> bool:
 class PinocchioKinematics(Kinematics):
     """Numerical kinematics for any robot described by a MuJoCo MJCF (or URDF) file.
 
-    The IK is the damped least squares closed-loop IK (CLIK) of Pinocchio as used in the Robot Control Stack.
+    The IK is the damped least squares closed-loop IK (CLIK) of Pinocchio as used in the Robot Control Stack,
+    roughly 10-25x slower than :class:`FrankaKinematics` with a fixed q7.
     Poses are expressed relative to ``base_frame`` (the model's world frame if None), only the first ``dof``
     configuration variables are controlled, remaining joints are held at ``q_rest``.
 

@@ -28,7 +28,7 @@ print(q)
 ## Numerical Solver for Arbitrary Robots (Pinocchio)
 `PinocchioKinematics` is a damped least squares closed-loop inverse kinematics (CLIK) solver built on Pinocchio, the same
 algorithm that is used in the [Robot Control Stack](https://github.com/RobotControlStack/robot-control-stack).
-It is about 20x slower than the analytical solver but works for any serial kinematic chain.
+Its IK is roughly 10-25x slower than the analytical solver with a fixed `q7` (2x compared to `q7` sampling, more from a seed far away from the solution), forward kinematics is equally fast, and it works for any serial kinematic chain.
 Both solvers share the `frankik.Kinematics` interface (`forward`, `inverse`, `dof`, `q_min`, `q_max`, `q_home`) and can be used interchangeably.
 
 Kinematics-only versions of the [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) Panda and FR3 models are bundled
