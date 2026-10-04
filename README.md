@@ -51,12 +51,13 @@ kin = PinocchioKinematics(
     tcp_frame="tcp_site",       # MJCF site/body/joint used as end-effector frame
     base_frame="base_link",     # poses are expressed relative to this body (default: MJCF world frame)
     dof=6,                      # number of controlled joints (default: all joints of the model)
-    eps=1e-5, max_iterations=500, dt=0.1, damping=1e-6, clamp_joint_limits=True, restarts=0,
+    eps=1e-5, max_iterations=500, dt=0.5, damping=1e-6, clamp_joint_limits=True,
 )
 print(kin.joint_names, kin.frame_names, kin.q_min, kin.q_max, kin.reference_configurations)
 tcp = np.eye(4); tcp[2, 3] = 0.1  # optional tool offset (4x4) applied to `tcp_frame`
 pose = kin.forward(kin.q_home, tcp_offset=tcp)
 q = kin.inverse(pose, q0=kin.q_home, tcp_offset=tcp)  # None if the solver did not converge
+q = kin.inverse(pose, global_solution=True)  # also retry from random configurations
 ```
 The numerical solver requires the optional Pinocchio dependency (pulled from the [`pin`](https://pypi.org/project/pin/) wheel, Linux and macOS only):
 ```shell

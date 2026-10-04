@@ -28,10 +28,9 @@ enum class ModelFormat { AUTO, MJCF, URDF };
 struct ClikParameters {
   double eps = 1e-4;
   int max_iterations = 1000;
-  double dt = 1e-1;
+  double dt = 0.5;
   double damping = 1e-6;
   bool clamp_joint_limits = true;
-  int restarts = 0;
 };
 
 // Forward kinematics and damped least squares closed-loop inverse kinematics
@@ -40,6 +39,8 @@ struct ClikParameters {
 // `tcp_frame`. Only the first `dof` configuration variables are controlled.
 class PinocchioKinematics {
  public:
+  static constexpr int kGlobalRestarts = 10;
+
   PinocchioKinematics(const std::string& path, const std::string& tcp_frame,
                       std::optional<std::string> base_frame = std::nullopt,
                       std::optional<int> dof = std::nullopt,
@@ -87,19 +88,27 @@ class PinocchioKinematics {
     return pose.toHomogeneousMatrix();
   }
 
+  // Solves for the configuration closest to q0. With global_solution the
+  // search restarts from random configurations within the joint limits when
+  // the local solve fails, which may land in another arm configuration.
   std::optional<Eigen::VectorXd> inverse(
       const Eigen::Matrix4d& pose, const Eigen::VectorXd& q0,
-      const std::optional<Eigen::Matrix4d>& tcp_offset = std::nullopt) {
+      const std::optional<Eigen::Matrix4d>& tcp_offset = std::nullopt,
+      bool global_solution = false) {
     pinocchio::SE3 target = to_se3(pose);
     if (tcp_offset) {
       target = target * to_se3(*tcp_offset).inverse();
     }
     Eigen::VectorXd q = full_configuration(q0);
+    if (const auto solution = solve(target, q)) {
+      return solution;
+    }
+    if (!global_solution) {
+      return std::nullopt;
+    }
     std::mt19937 rng(0);
-    for (int attempt = 0; attempt <= parameters_.restarts; ++attempt) {
-      if (attempt > 0) {
-        q.head(dof_) = random_configuration(q.head(dof_), rng);
-      }
+    for (int attempt = 0; attempt < kGlobalRestarts; ++attempt) {
+      q.head(dof_) = random_configuration(q.head(dof_), rng);
       if (const auto solution = solve(target, q)) {
         return solution;
       }
@@ -151,6 +160,13 @@ class PinocchioKinematics {
   }
 
  private:
+  // Damped least squares closed-loop IK as in the Pinocchio examples: each
+  // iteration integrates dt times the Gauss-Newton step with a constant
+  // damping, which converges linearly (dt = 0.1 needs ~100 iterations, 0.5
+  // about 5x fewer at the same success rate). A Levenberg-Marquardt variant
+  // with a full step and error proportional damping (Wn = lambda * ||err||^2,
+  // Chan & Lawrence / Sugihara) would converge quadratically near the solution
+  // and is the next step if the solver needs to get faster.
   std::optional<Eigen::VectorXd> solve(const pinocchio::SE3& target,
                                        Eigen::VectorXd q) {
     const auto q_min = model_.lowerPositionLimit.head(dof_);

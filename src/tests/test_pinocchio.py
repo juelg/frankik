@@ -129,8 +129,7 @@ def test_solver_parameters():
     assert kin.parameters.eps == 1e-6
     assert kin.parameters.max_iterations == 500
     assert kin.parameters.clamp_joint_limits is True
-    assert kin.parameters.dt == 0.1
-    assert kin.parameters.restarts == 0
+    assert kin.parameters.dt == 0.5
     assert PinocchioKinematics(RobotType.FR3, clamp_joint_limits=False).parameters.clamp_joint_limits is False
 
     params = kin.parameters
@@ -154,13 +153,12 @@ def test_solver_parameters():
         PinocchioKinematics(RobotType.FR3, parameters=params, eps=1e-3)
 
 
-def test_restarts_recover_from_bad_seed():
-    plain = PinocchioKinematics(RobotType.FR3)
-    restarting = PinocchioKinematics(RobotType.FR3, restarts=10)
+def test_global_solution_recovers_from_bad_seed():
+    kin = PinocchioKinematics(RobotType.FR3)
     bad_seed = np.array([0.0, 1.5, 0.0, -0.5, 0.0, 4.0, 0.0])
-    targets = [plain.forward(random_q(plain.q_min, plain.q_max)) for _ in range(20)]
-    assert any(plain.inverse(target, q0=bad_seed) is None for target in targets)
-    assert all(restarting.inverse(target, q0=bad_seed) is not None for target in targets)
+    targets = [kin.forward(random_q(kin.q_min, kin.q_max)) for _ in range(20)]
+    assert any(kin.inverse(target, q0=bad_seed) is None for target in targets)
+    assert all(kin.inverse(target, q0=bad_seed, global_solution=True) is not None for target in targets)
 
 
 def test_q_home_override():

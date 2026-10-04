@@ -22,10 +22,9 @@ class ClikParameters:
         self,
         eps: float = 0.0001,
         max_iterations: int = 1000,
-        dt: float = 0.1,
+        dt: float = 0.5,
         damping: float = 1e-06,
         clamp_joint_limits: bool = True,
-        restarts: int = 0,
     ) -> None: ...
     def __repr__(self) -> str: ...
     @property
@@ -60,14 +59,6 @@ class ClikParameters:
 
     @eps.setter
     def eps(self, arg0: float) -> None: ...
-    @property
-    def restarts(self) -> int:
-        """
-        Retries from random configurations within the joint limits if the solver did not converge from q0
-        """
-
-    @restarts.setter
-    def restarts(self, arg0: int) -> None: ...
 
 class ModelFormat:
     """
@@ -135,9 +126,10 @@ class PinocchioKinematics:
         tcp_offset: (
             numpy.ndarray[tuple[typing.Literal[4], typing.Literal[4]], numpy.dtype[numpy.float64]] | None
         ) = None,
+        global_solution: bool = False,
     ) -> numpy.ndarray[tuple[M], numpy.dtype[numpy.float64]] | None:
         """
-        Controlled joint values reaching pose from seed q0 (dof or nq entries), None if the solver did not converge.
+        Controlled joint values reaching pose from seed q0 (dof or nq entries), None if the solver did not converge. global_solution retries from random configurations within the joint limits.
         """
 
     def joint_names(self) -> list[str]: ...

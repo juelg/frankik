@@ -262,7 +262,7 @@ class PinocchioKinematics(Kinematics):
             q_home: Default IK seed. Defaults to the MJCF ``home`` keyframe or the neutral configuration.
             model_format: ``"auto"`` (by file extension), ``"mjcf"`` or ``"urdf"``.
             parameters: Solver parameters, alternatively given as keyword arguments
-                (``eps``, ``max_iterations``, ``dt``, ``damping``, ``clamp_joint_limits``, ``restarts``).
+                (``eps``, ``max_iterations``, ``dt``, ``damping``, ``clamp_joint_limits``).
         """
         pin = _load_pin()
         self.robot_type = self._as_robot_type(model)
@@ -381,13 +381,21 @@ class PinocchioKinematics(Kinematics):
         return self._impl.forward(np.asarray(q0, dtype=np.float64), tcp_offset)
 
     def inverse(
-        self, pose: np.ndarray, q0: np.ndarray | None = None, tcp_offset: np.ndarray | None = None
+        self,
+        pose: np.ndarray,
+        q0: np.ndarray | None = None,
+        tcp_offset: np.ndarray | None = None,
+        global_solution: bool = False,
     ) -> np.ndarray | None:
         """Joint values of the controlled joints reaching ``pose`` from seed ``q0`` (default ``q_home``),
-        ``None`` if the solver did not converge."""
+        ``None`` if the solver did not converge. With ``global_solution`` the solver restarts from random
+        configurations within the joint limits if it does not converge from ``q0``, which may switch the arm
+        configuration."""
         if q0 is None:
             q0 = self.q_home
-        return self._impl.inverse(np.asarray(pose, dtype=np.float64), np.asarray(q0, dtype=np.float64), tcp_offset)
+        return self._impl.inverse(
+            np.asarray(pose, dtype=np.float64), np.asarray(q0, dtype=np.float64), tcp_offset, global_solution
+        )
 
     def __repr__(self) -> str:
         return (
