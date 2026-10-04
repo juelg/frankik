@@ -1,0 +1,93 @@
+{
+  "machine": "frankik 1.0 benchmark machine",
+  "benchmarks": [
+    {
+      "name": "FrankIK",
+      "status": "OK",
+      "t_init": 0.0,
+      "results": [
+        2.6e-06,
+        6.5e-06,
+        2.7e-06,
+        6.5e-06
+      ]
+    },
+    {
+      "name": "RoboticstoolboxPython",
+      "status": "OK",
+      "t_init": 0.81719,
+      "results": [
+        1.45e-05,
+        8.9e-06,
+        1.31e-05,
+        1.07e-05
+      ]
+    },
+    {
+      "name": "FastIK",
+      "status": "OK",
+      "t_init": 0.0,
+      "results": [
+        9.7e-06,
+        1.14e-05,
+        9.2e-06,
+        1.14e-05
+      ]
+    },
+    {
+      "name": "PinocchioCPP",
+      "status": "OK",
+      "t_init": 0.00205,
+      "results": [
+        4e-06,
+        0.0001352,
+        3.9e-06,
+        0.0001597
+      ]
+    },
+    {
+      "name": "RoboticsLibrary",
+      "status": "OK",
+      "t_init": 0.00127,
+      "results": [
+        5e-06,
+        0.0001733,
+        4.8e-06,
+        0.0001957
+      ]
+    },
+    {
+      "name": "ManipulaPy",
+      "status": "OK",
+      "t_init": 0.02817,
+      "results": [
+        0.0002529,
+        0.0024451,
+        0.0002555,
+        0.0025822
+      ]
+    },
+    {
+      "name": "GenesisWorld",
+      "status": "OK",
+      "t_init": 5.12017,
+      "results": [
+        0.0017409,
+        0.0043826,
+        0.0017325,
+        0.001917
+      ]
+    },
+    {
+      "name": "IKPy",
+      "status": "OK",
+      "t_init": 0.07299,
+      "results": [
+        7.34e-05,
+        0.0671459,
+        7.23e-05,
+        0.0620768
+      ]
+    }
+  ]
+}

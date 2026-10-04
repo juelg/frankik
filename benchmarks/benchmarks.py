@@ -1,14 +1,23 @@
+import json
+import platform
 import time
 import typing
+from pathlib import Path
 
-import genesis as gs
 import matplotlib.pyplot as plt
 import numpy as np
-import rcs
-import rcs_robotics_library
-from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 from frankik import FrankaKinematics, PinocchioKinematics, RobotType
+
+FR3_URDF = str(Path(__file__).resolve().parents[1] / "src" / "tests" / "data" / "fr3.urdf")
+RESULTS = Path(__file__).resolve().parent / "benchmark_results.json"
+
+
+def quaternion_wxyz(rotation: np.ndarray) -> np.ndarray:
+    from scipy.spatial.transform import Rotation
+
+    x, y, z, w = Rotation.from_matrix(rotation).as_quat()
+    return np.array([w, x, y, z])
 
 
 class Kinematics:
@@ -53,7 +62,7 @@ class FrankIK(Kinematics):
         return self.frankik.forward(q0)
 
     def inverse(self, pose, q0=None):
-        return self.frankik.inverse(pose, q0=q0, q7=np.pi/4)
+        return self.frankik.inverse(pose, q0=q0, q7=np.pi / 4)
 
 
 class FrankIKPinocchio(Kinematics):
@@ -67,39 +76,26 @@ class FrankIKPinocchio(Kinematics):
         return self.frankik.inverse(pose, q0=q0)
 
 
-class PinocchioCPP(Kinematics):
-    def __init__(self):
-        self.ik = rcs.common.Pin(
-            "robot-control-stack/assets/scenes/fr3_empty_world/robot.xml",
-            "attachment_site_0",
-            urdf=False,
-        )
-
-    def forward(self, q0):
-        return self.ik.forward(q0).pose_matrix()
-
-    def inverse(self, pose, q0=None):
-        pose = rcs.common.Pose(pose_matrix=pose)
-        return self.ik.inverse(pose, q0=q0)
-
-
 class RoboticsLibrary(Kinematics):
     def __init__(self):
-        self.ik = rcs_robotics_library.rl.RoboticsLibraryIK("robot-control-stack/assets/fr3/urdf/fr3.urdf")
+        import rcs.common
+        import rcs_robotics_library
+
+        self.ik = rcs_robotics_library.rl.RoboticsLibraryIK(FR3_URDF)
+        self.pose = rcs.common.Pose
 
     def forward(self, q0):
         return self.ik.forward(q0).pose_matrix()
 
     def inverse(self, pose, q0=None):
-        pose = rcs.common.Pose(pose_matrix=pose)
-        return self.ik.inverse(pose, q0=q0)
+        return self.ik.inverse(self.pose(pose_matrix=pose), q0=q0)
 
 
 class IKPy(Kinematics):
     def __init__(self):
         from ikpy.chain import Chain
 
-        self.chain = Chain.from_urdf_file("robot-control-stack/assets/fr3/urdf/fr3.urdf", base_elements=["fr3_link0"])
+        self.chain = Chain.from_urdf_file(FR3_URDF, base_elements=["fr3_link0"])
 
     def forward(self, q0):
         q = np.zeros(9)
@@ -109,10 +105,7 @@ class IKPy(Kinematics):
     def inverse(self, pose, q0=None):
         q = np.zeros(9)
         q[1:8] = q0
-        pose = rcs.common.Pose(pose_matrix=pose)
-        ik_results = self.chain.inverse_kinematics(
-            pose.translation(), initial_position=q
-        )  # , pose.xyzrpy()[3:]) #, orientation_mode="all")
+        ik_results = self.chain.inverse_kinematics(pose[:3, 3], initial_position=q)
         if ik_results is None:
             return None
         return ik_results[1:8]  # Exclude the first element which is for the base
@@ -124,16 +117,15 @@ class FastIK(Kinematics):
         from ikfast_franka_panda import get_fk
 
         trans, rot = get_fk(q0)
-        pose = rcs.common.Pose(translation=np.array(trans), rotation=np.array(rot))
-        return pose.pose_matrix()
+        pose = np.eye(4)
+        pose[:3, :3] = np.array(rot)
+        pose[:3, 3] = np.array(trans)
+        return pose
 
     def inverse(self, pose, q0=None):
         from ikfast_franka_panda import get_ik
 
-        pose = rcs.common.Pose(pose_matrix=pose)
-        return get_ik(
-            trans_list=pose.translation().tolist(), rot_list=pose.rotation_m().tolist(), free_jt_vals=[np.pi / 4]
-        )
+        return get_ik(trans_list=pose[:3, 3].tolist(), rot_list=pose[:3, :3].tolist(), free_jt_vals=[np.pi / 4])
 
 
 class RoboticstoolboxPython(Kinematics):
@@ -152,8 +144,9 @@ class RoboticstoolboxPython(Kinematics):
 
 class ManipulaPy(Kinematics):
     def __init__(self):
-        urdf_path = "robot-control-stack/assets/fr3/urdf/fr3.urdf"
-        self.robot = URDFToSerialManipulator(urdf_path).serial_manipulator
+        from ManipulaPy.urdf_processor import URDFToSerialManipulator
+
+        self.robot = URDFToSerialManipulator(FR3_URDF).serial_manipulator
 
     def forward(self, q0):
         return self.robot.forward_kinematics(q0)
@@ -167,7 +160,8 @@ class ManipulaPy(Kinematics):
 
 class GenesisWorld(Kinematics):
     def __init__(self):
-        ########################## init ##########################
+        import genesis as gs
+
         gs.init(backend=gs.gpu)
 
         ########################## create a scene ##########################
@@ -219,11 +213,10 @@ class GenesisWorld(Kinematics):
         self.end_effector = self.franka.get_link("hand")  # hand_0, attachment_site_0
 
     def inverse(self, pose, q0=None):
-        pose = rcs.common.Pose(pose_matrix=pose)
         qpos = self.franka.inverse_kinematics(
             link=self.end_effector,
-            pos=pose.translation(),
-            quat=pose.rotation_q(),
+            pos=pose[:3, 3],
+            quat=quaternion_wxyz(pose[:3, :3]),
         )
         return qpos
 
@@ -234,13 +227,13 @@ class GenesisWorld(Kinematics):
         # self.franka.set_dofs_position(q)
         # self.scene.step()  # update forward kinematics
         self.franka.set_qpos(q)
-        q = self.end_effector.get_quat().cpu().numpy().copy()
-        q2 = q.copy()
-        q[0] = q[3]
-        q[3] = q2[0]
-        pose = rcs.common.Pose(translation=self.end_effector.get_pos().cpu().numpy(), quaternion=q)
+        from scipy.spatial.transform import Rotation
 
-        return pose.pose_matrix()
+        w, x, y, z = self.end_effector.get_quat().cpu().numpy()
+        pose = np.eye(4)
+        pose[:3, :3] = Rotation.from_quat([x, y, z, w]).as_matrix()
+        pose[:3, 3] = self.end_effector.get_pos().cpu().numpy()
+        return pose
 
 
 def test_speed(kinematics: Kinematics, n_iters: int = 1000):
@@ -303,13 +296,12 @@ def test_speed(kinematics: Kinematics, n_iters: int = 1000):
     return (t_fk_small_acc / n_iters, t_ik_small_acc / n_iters, t_fk_large_acc / n_iters, t_ik_large_acc / n_iters)
 
 
-def benchmark_all():
+def benchmark_all(previous_results: Path | None = None):
     kinematics_classes = [
         (FrankIK, 1000),
         (RoboticstoolboxPython, 1000),  # numpy version needs to be below 2.0
         (FastIK, 1000),
         (FrankIKPinocchio, 1000),
-        (PinocchioCPP, 1000),
         (RoboticsLibrary, 1000),
         (ManipulaPy, 1000),
         (GenesisWorld, 1000),
@@ -323,23 +315,16 @@ def benchmark_all():
     for cls, n_iters in kinematics_classes:
         library_name = cls.__name__
 
-        # We wrap the execution in the suppressor to hide the "crap"
-        # printed during init or runtime
-        # try:
-        # 1. Measure Init
-        t0 = time.perf_counter()
-        instance = cls()
-        t_init = time.perf_counter() - t0
-
-        # 2. Measure Speed
-        results = test_speed(instance, n_iters=n_iters)
-
-        # Store success
-        benchmark_data.append({"name": library_name, "status": "OK", "t_init": t_init, "results": results})
-
-        # except Exception as e:
-        #     # Store failure
-        #     benchmark_data.append({"name": library_name, "status": "FAIL", "error": str(e)})
+        try:
+            t0 = time.perf_counter()
+            instance = cls()
+            t_init = time.perf_counter() - t0
+            results = test_speed(instance, n_iters=n_iters)
+            benchmark_data.append({"name": library_name, "status": "OK", "t_init": t_init, "results": results})
+        except Exception as e:  # noqa: BLE001 - a missing or broken library must not stop the other benchmarks
+            benchmark_data.append({"name": library_name, "status": "FAIL", "error": f"{type(e).__name__}: {e}"})
+    if previous_results is not None:
+        keep_previous_results(benchmark_data, previous_results)
 
     # --- Print Table After All Runs ---
     print("\n" + "=" * 95)
@@ -349,21 +334,36 @@ def benchmark_all():
     print("-" * 95)
 
     for entry in benchmark_data:
-        if entry["status"] == "OK":
+        if entry["status"] in ("OK", "KEPT"):
             fk_s, ik_s, fk_l, ik_l = entry["results"]
+            name = entry["name"] + (" *" if entry["status"] == "KEPT" else "")
             print(
-                f"{entry['name']:<25} | {entry['t_init']:<10.5f} | {fk_s:<12.7f} | {ik_s:<12.7f} | {fk_l:<12.7f} | {ik_l:<12.7f}"
+                f"{name:<25} | {entry['t_init']:<10.5f} | {fk_s:<12.7f} | {ik_s:<12.7f} | {fk_l:<12.7f} | {ik_l:<12.7f}"
             )
         else:
             print(f"{entry['name']:<25} | FAILED: {entry['error']}")
-    print("=" * 95 + "\n")
+    print("=" * 95)
+    if any(entry["status"] == "KEPT" for entry in benchmark_data):
+        print("* could not run here, result kept from", previous_results)
+    print()
 
+    RESULTS.write_text(
+        json.dumps({"machine": platform.processor() or platform.machine(), "benchmarks": benchmark_data}, indent=2)
+    )
     plot_results(benchmark_data)
+
+
+def keep_previous_results(benchmark_data, previous_results: Path):
+    """Fill in benchmarks that could not run (e.g. missing GPU) with the results of an earlier run."""
+    previous = {entry["name"]: entry for entry in json.loads(previous_results.read_text())["benchmarks"]}
+    for entry in benchmark_data:
+        if entry["status"] == "FAIL" and entry["name"] in previous:
+            entry.update(previous[entry["name"]], status="KEPT")
 
 
 def plot_results(benchmark_data):
     # Filter out failed benchmarks
-    successful_benchmarks = [entry for entry in benchmark_data if entry["status"] == "OK"]
+    successful_benchmarks = [entry for entry in benchmark_data if entry["status"] in ("OK", "KEPT")]
 
     if not successful_benchmarks:
         print("No successful benchmarks to plot.")
@@ -398,4 +398,6 @@ def plot_results(benchmark_data):
 
 
 if __name__ == "__main__":
-    benchmark_all()
+    import sys
+
+    benchmark_all(Path(sys.argv[1]) if len(sys.argv) > 1 else None)
