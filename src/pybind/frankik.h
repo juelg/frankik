@@ -135,6 +135,7 @@ Eigen::Matrix<double, 4, 7> ik_full(
   std::array<Eigen::Vector3d, 4> V2P_all;
 
   for (int i = 0; i < 2; i++) {
+    if (std::isnan(q_all(2 * i, 5))) continue;
     Eigen::Vector3d z_6_5;
     z_6_5 << std::sin(q6[i]), std::cos(q6[i]), 0.0;
     Eigen::Vector3d z_5 = R_6 * z_6_5;
@@ -164,6 +165,7 @@ Eigen::Matrix<double, 4, 7> ik_full(
   }
 
   for (int i = 0; i < 4; i++) {
+    if (std::isnan(q_all(i, 5))) continue;
     if (q_all(i, 0) <= q_min[0] || q_all(i, 0) >= q_max[0] ||
         q_all(i, 1) <= q_min[1] || q_all(i, 1) >= q_max[1]) {
       q_all.row(i) = q_NAN;
@@ -435,8 +437,8 @@ std::vector<Vector7d> ik_sample_q7(
       ik_solutions.push_back(tmp_ik_sol);
     } else {
       auto tmp_ik_sols = ik_full(O_T_EE, q_actual_array, q7, is_fr3);
-      for (size_t j = 0; j <= 4; ++j) {
-        if (std::isnan(tmp_ik_sols.row(j)[0])) {
+      for (size_t j = 0; j < 4; ++j) {
+        if (tmp_ik_sols.row(j).hasNaN()) {
           continue;
         }
         ik_solutions.push_back(tmp_ik_sols.row(j));
