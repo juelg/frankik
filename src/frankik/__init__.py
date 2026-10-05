@@ -114,7 +114,7 @@ class FrankaKinematics:
         def get_min(qs):
             if len(qs) == 0:
                 return np.nan
-            q_diffs = np.sum((np.array(qs) - q0) * joint_weight, axis=1) ** 2
+            q_diffs = np.sum(((np.array(qs) - q0) * joint_weight) ** 2, axis=1)
             return qs[np.argmin(q_diffs)]
 
         if q7 is not None:
