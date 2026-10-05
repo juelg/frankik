@@ -437,7 +437,7 @@ std::vector<Vector7d> ik_sample_q7(
       ik_solutions.push_back(tmp_ik_sol);
     } else {
       auto tmp_ik_sols = ik_full(O_T_EE, q_actual_array, q7, is_fr3);
-      for (size_t j = 0; j <= 4; ++j) {
+      for (size_t j = 0; j < 4; ++j) {
         if (tmp_ik_sols.row(j).hasNaN()) {
           continue;
         }
