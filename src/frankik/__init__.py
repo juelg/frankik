@@ -112,6 +112,7 @@ class FrankaKinematics:
         new_pose = pose @ self.pose_inverse(tcp_offset) if tcp_offset is not None else pose
 
         def get_min(qs):
+            qs = [q for q in qs if not np.isnan(q).any()]
             if len(qs) == 0:
                 return np.nan
             q_diffs = np.sum(((np.array(qs) - q0) * joint_weight) ** 2, axis=1)
