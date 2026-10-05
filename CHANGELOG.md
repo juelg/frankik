@@ -1,3 +1,11 @@
+## v1.0.1 (2026-10-05)
+
+### Fix
+
+- out-of-bounds row access in ik_sample_q7
+- drop partially-NaN IK solutions in global mode
+- correct joint distance metric in IK solution selection
+
 ## v1.0.0 (2026-01-01)
 
 ### Feat
