@@ -193,7 +193,10 @@ class PinocchioKinematics {
       const pinocchio::SE3 iMd =
           data_.oMf[tcp_frame_id_].actInv(base_placement() * target);
       const pinocchio::Motion::Vector6 err = pinocchio::log6(iMd).toVector();
-      if (err.norm() < parameters_.eps) {
+      // with an active posture task the first iteration always runs so that
+      // a pose that is already reached still moves towards the posture
+      const bool posture_pending = parameters_.nullspace_gain > 0.0 && i == 0;
+      if (err.norm() < parameters_.eps && !posture_pending) {
         return Eigen::VectorXd(q.head(dof_));
       }
       pinocchio::computeFrameJacobian(model_, data_, q, tcp_frame_id_, J);
@@ -206,9 +209,11 @@ class PinocchioKinematics {
         const Eigen::MatrixXd J_pinv =
             J.transpose() *
             JJt.ldlt().solve(pinocchio::Data::Matrix6::Identity());
+        // the posture step per iteration is at most the full distance
+        const double gain =
+            std::min(parameters_.nullspace_gain, 1.0 / parameters_.dt);
         Eigen::VectorXd posture = Eigen::VectorXd::Zero(model_.nv);
-        posture.head(dof_) =
-            parameters_.nullspace_gain * (nullspace_q_ - q.head(dof_));
+        posture.head(dof_) = gain * (nullspace_q_ - q.head(dof_));
         v.noalias() = -J_pinv * err;
         v.noalias() += posture - J_pinv * (J * posture);
       } else {

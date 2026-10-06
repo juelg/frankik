@@ -174,6 +174,12 @@ def test_nullspace_keeps_posture():
     assert plain is not None and pulled is not None
     assert_pose_close(with_posture.forward(pulled), target)
     assert np.linalg.norm(pulled - posture) < np.linalg.norm(plain - posture)
+    # a pose that is already reached still moves into the posture within the null space
+    swung = kin.inverse(kin.forward(posture), q0=posture + np.array([1.2, 0.0, -1.2, 0.0, 0.0, 0.0, 0.0]))
+    assert swung is not None and np.linalg.norm(swung - posture) > 1.0
+    settled = with_posture.inverse(kin.forward(posture), q0=swung)
+    assert settled is not None and np.linalg.norm(settled - posture) < 0.01
+    assert_pose_close(with_posture.forward(settled), kin.forward(posture), atol=1e-5)
     with pytest.raises(ValueError, match="nullspace_q"):
         kin.nullspace_q = np.zeros(3)
 
