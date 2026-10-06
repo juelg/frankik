@@ -38,6 +38,9 @@ const std::array<double, 7> q_min_fr3 = {
 const std::array<double, 7> q_max_fr3 = {
     {2.3476, 1.5454, 2.4937, -0.4226, 2.5100, 4.2841, 2.7045}};
 
+// |q2| below which both shoulder branches are considered in ik()
+const double kShoulderBand = 0.1;
+
 const Vector7d kQDefault =
     (Vector7d() << 0.0, -M_PI_4, 0.0, -3 * M_PI_4, 0.0, M_PI_2, 0.0).finished();
 
@@ -344,58 +347,81 @@ Vector7d ik(Eigen::Matrix<double, 4, 4> O_T_EE,
   Eigen::Vector3d V2P = p_6 - LP6 * z_5 - p_2;
 
   double L2P = V2P.norm();
+  const bool shoulder_singular = std::fabs(V2P[2] / L2P) > 0.99999;
+  const double q2_magnitude = shoulder_singular ? 0.0 : std::acos(V2P[2] / L2P);
 
-  if (std::fabs(V2P[2] / L2P) > 0.99999) {
-    q[0] = q_actual_array[0];
-    q[1] = 0.0;
-  } else {
-    q[0] = std::atan2(V2P[1], V2P[0]);
-    q[1] = std::acos(V2P[2] / L2P);
-    if (is_case1_1) {
-      if (q[0] < 0.0)
-        q[0] += M_PI;
-      else
-        q[0] -= M_PI;
-      q[1] = -q[1];
+  const Vector7d q_partial = q;
+  // IK: q1, q2, q3 and q5 depend on the shoulder branch (sign of q2)
+  const auto solve_shoulder = [&](bool shoulder_negative) -> Vector7d {
+    Vector7d q = q_partial;
+    if (shoulder_singular) {
+      q[0] = q_actual_array[0];
+      q[1] = 0.0;
+    } else {
+      q[0] = std::atan2(V2P[1], V2P[0]);
+      q[1] = q2_magnitude;
+      if (shoulder_negative) {
+        if (q[0] < 0.0)
+          q[0] += M_PI;
+        else
+          q[0] -= M_PI;
+        q[1] = -q[1];
+      }
     }
+
+    if (q[0] <= q_min[0] || q[0] >= q_max[0] || q[1] <= q_min[1] ||
+        q[1] >= q_max[1])
+      return q_NAN;
+
+    // IK: compute q3
+    Eigen::Vector3d z_3 = V2P / V2P.norm();
+    Eigen::Vector3d Y_3 = -V26.cross(V2P);
+    Eigen::Vector3d y_3 = Y_3 / Y_3.norm();
+    Eigen::Vector3d x_3 = y_3.cross(z_3);
+    Eigen::Matrix3d R_1;
+    double c1 = std::cos(q[0]);
+    double s1 = std::sin(q[0]);
+    R_1 << c1, -s1, 0.0, s1, c1, 0.0, 0.0, 0.0, 1.0;
+    Eigen::Matrix3d R_1_2;
+    double c2 = std::cos(q[1]);
+    double s2 = std::sin(q[1]);
+    R_1_2 << c2, -s2, 0.0, 0.0, 0.0, 1.0, -s2, -c2, 0.0;
+    Eigen::Matrix3d R_2 = R_1 * R_1_2;
+    Eigen::Vector3d x_2_3 = R_2.transpose() * x_3;
+    q[2] = std::atan2(x_2_3[2], x_2_3[0]);
+
+    if (q[2] <= q_min[2] || q[2] >= q_max[2]) return q_NAN;
+
+    // IK: compute q5
+    Eigen::Vector3d VH4 = p_2 + d3 * z_3 + a4 * x_3 - p_6 + d5 * z_5;
+    Eigen::Matrix3d R_5_6;
+    double c6 = std::cos(q[5]);
+    double s6 = std::sin(q[5]);
+    R_5_6 << c6, -s6, 0.0, 0.0, 0.0, -1.0, s6, c6, 0.0;
+    Eigen::Matrix3d R_5 = R_6 * R_5_6.transpose();
+    Eigen::Vector3d V_5_H4 = R_5.transpose() * VH4;
+
+    q[4] = -std::atan2(V_5_H4[1], V_5_H4[0]);
+    if (q[4] <= q_min[4] || q[4] >= q_max[4]) return q_NAN;
+
+    return q;
+  };
+
+  // Near q2 = 0 both shoulder branches describe almost the same arm and the
+  // sign of the seed's q2 is not a reliable branch label, so the closer valid
+  // branch is taken there instead of flipping to the mirrored configuration.
+  if (std::fabs(q_actual_array[1]) < kShoulderBand ||
+      q2_magnitude < kShoulderBand) {
+    const Vector7d negative = solve_shoulder(true);
+    const Vector7d positive = solve_shoulder(false);
+    if (negative.hasNaN()) return positive;
+    if (positive.hasNaN()) return negative;
+    return (negative - q_actual_array).squaredNorm() <=
+                   (positive - q_actual_array).squaredNorm()
+               ? negative
+               : positive;
   }
-
-  if (q[0] <= q_min[0] || q[0] >= q_max[0] || q[1] <= q_min[1] ||
-      q[1] >= q_max[1])
-    return q_NAN;
-
-  // IK: compute q3
-  Eigen::Vector3d z_3 = V2P / V2P.norm();
-  Eigen::Vector3d Y_3 = -V26.cross(V2P);
-  Eigen::Vector3d y_3 = Y_3 / Y_3.norm();
-  Eigen::Vector3d x_3 = y_3.cross(z_3);
-  Eigen::Matrix3d R_1;
-  double c1 = std::cos(q[0]);
-  double s1 = std::sin(q[0]);
-  R_1 << c1, -s1, 0.0, s1, c1, 0.0, 0.0, 0.0, 1.0;
-  Eigen::Matrix3d R_1_2;
-  double c2 = std::cos(q[1]);
-  double s2 = std::sin(q[1]);
-  R_1_2 << c2, -s2, 0.0, 0.0, 0.0, 1.0, -s2, -c2, 0.0;
-  Eigen::Matrix3d R_2 = R_1 * R_1_2;
-  Eigen::Vector3d x_2_3 = R_2.transpose() * x_3;
-  q[2] = std::atan2(x_2_3[2], x_2_3[0]);
-
-  if (q[2] <= q_min[2] || q[2] >= q_max[2]) return q_NAN;
-
-  // IK: compute q5
-  Eigen::Vector3d VH4 = p_2 + d3 * z_3 + a4 * x_3 - p_6 + d5 * z_5;
-  Eigen::Matrix3d R_5_6;
-  double c6 = std::cos(q[5]);
-  double s6 = std::sin(q[5]);
-  R_5_6 << c6, -s6, 0.0, 0.0, 0.0, -1.0, s6, c6, 0.0;
-  Eigen::Matrix3d R_5 = R_6 * R_5_6.transpose();
-  Eigen::Vector3d V_5_H4 = R_5.transpose() * VH4;
-
-  q[4] = -std::atan2(V_5_H4[1], V_5_H4[0]);
-  if (q[4] <= q_min[4] || q[4] >= q_max[4]) return q_NAN;
-
-  return q;
+  return solve_shoulder(is_case1_1);
 }
 
 std::vector<Vector7d> ik_sample_q7(

@@ -9,6 +9,10 @@ Existing libraries often rely on slow, generic numerical solvers, demand complex
 `frankik` is specialized for the Franka robot (supports both Panda and FR3) and easy to install via pip.
 Its IK solver is almost twice as fast as the fastest alternative Python library; see [Benchmarks](#speed-benchmark).
 
+Since version 2, `frankik` additionally ships a generic **numerical solver** (`PinocchioKinematics`) based on
+[Pinocchio](https://github.com/stack-of-tasks/pinocchio) that works with any robot described by a MuJoCo MJCF (or URDF) file,
+see [Numerical solver for arbitrary robots](#numerical-solver-for-arbitrary-robots-pinocchio).
+
 ## Example
 ```python
 import numpy as np
@@ -21,9 +25,52 @@ assert np.allclose(q, q_home)
 print(q)
 ```
 
+## Numerical Solver for Arbitrary Robots (Pinocchio)
+`PinocchioKinematics` is a damped least squares closed-loop inverse kinematics (CLIK) solver built on Pinocchio, the same
+algorithm that is used in the [Robot Control Stack](https://github.com/RobotControlStack/robot-control-stack).
+Its IK is about 3-4x slower than the analytical solver with a fixed `q7` and faster than `q7` sampling, forward kinematics is equally fast, and it works for any serial kinematic chain.
+Both solvers share the `frankik.Kinematics` interface (`forward`, `inverse`, `dof`, `q_min`, `q_max`, `q_home`) and can be used interchangeably.
+
+Kinematics-only versions of the [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) Panda and FR3 models are bundled
+(see [`src/frankik/models`](src/frankik/models/README.md)) and selected via `RobotType`:
+```python
+import numpy as np
+from frankik import PinocchioKinematics, RobotType
+
+kin = PinocchioKinematics(RobotType.FR3)  # or RobotType.PANDA
+pose = kin.forward(kin.q_home)  # pose of the flange (`attachment_site`) relative to the robot base
+q = kin.inverse(pose, q0=kin.q_home)
+assert q is not None and np.allclose(kin.forward(q), pose, atol=1e-3)
+```
+Any other robot can be used by pointing to its MJCF file and naming the end-effector site (or body/joint) and optionally the base body,
+the number of controlled joints (`dof`, the first `dof` configuration variables; remaining joints such as gripper fingers are held fixed)
+and the solver parameters:
+```python
+kin = PinocchioKinematics(
+    "path/to/robot.xml",
+    tcp_frame="tcp_site",       # MJCF site/body/joint used as end-effector frame
+    base_frame="base_link",     # poses are expressed relative to this body (default: MJCF world frame)
+    dof=6,                      # number of controlled joints (default: all joints of the model)
+    nullspace_q=q_upright,        # optional posture for the redundant joints, e.g. elbow up
+    eps=1e-5, max_iterations=500, dt=0.5, damping=1e-6, clamp_joint_limits=True,
+)
+print(kin.joint_names, kin.frame_names, kin.q_min, kin.q_max, kin.reference_configurations)
+tcp = np.eye(4); tcp[2, 3] = 0.1  # optional tool offset (4x4) applied to `tcp_frame`
+pose = kin.forward(kin.q_home, tcp_offset=tcp)
+q = kin.inverse(pose, q0=kin.q_home, tcp_offset=tcp)  # None if the solver did not converge
+q = kin.inverse(pose, global_solution=True)  # also retry from random configurations
+```
+The numerical solver requires the optional Pinocchio dependency (pulled from the [`pin`](https://pypi.org/project/pin/) wheel, Linux and macOS only):
+```shell
+pip install 'frankik[pinocchio]'
+```
+`frankik.has_pinocchio()` tells whether the numerical solver is available in the current environment.
+
 ## Installation from PyPI (Recommended)
 ```shell
 pip install frankik
+# with the numerical Pinocchio solver
+pip install 'frankik[pinocchio]'
 ```
 
 ## Installation from Source
@@ -32,6 +79,9 @@ git clone https://github.com/juelg/frankik.git
 cd frankik
 pip install -v .
 ```
+The Pinocchio module is built automatically if the `pin` wheel is installed in the build environment
+(it is part of the build requirements on Linux/macOS). Set `CMAKE_ARGS=-DFRANKIK_WITH_PINOCCHIO=ON|OFF|AUTO`
+to force or skip it (`make gcccompile WITH_PINOCCHIO=OFF` for plain CMake builds).
 ### Development Installation
 ```shell
 pip install -ve '.[dev]'
@@ -51,20 +101,23 @@ make stubgen
 
 ## Speed Benchmark
 See the [benchmarks folder](/benchmarks/).
-The outcome is based on 1000 seeded random trials (except IKPy, which uses 100 trials).
+The outcome is based on 1000 seeded random trials (except IKPy, which uses 100 trials), IK seeded with the home
+configuration for targets 3° (small) and 10° (large) away from it. `FrankIKPinocchio` is the numerical solver of
+frankik with default parameters.
 ```shell
 ===============================================================================================
 Library                   | Init (s)   | FK-Small(s)  | IK-Small(s)  | FK-Large(s)  | IK-Large(s) 
 -----------------------------------------------------------------------------------------------
-FrankIK                   | 0.00000    | 0.0000026    | 0.0000065    | 0.0000027    | 0.0000065   
-RoboticstoolboxPython     | 0.81719    | 0.0000145    | 0.0000089    | 0.0000131    | 0.0000107   
-FastIK                    | 0.00000    | 0.0000097    | 0.0000114    | 0.0000092    | 0.0000114   
-PinocchioCPP              | 0.00205    | 0.0000040    | 0.0001352    | 0.0000039    | 0.0001597   
-RoboticsLibrary           | 0.00127    | 0.0000050    | 0.0001733    | 0.0000048    | 0.0001957   
-ManipulaPy                | 0.02817    | 0.0002529    | 0.0024451    | 0.0002555    | 0.0025822   
-GenesisWorld              | 5.12017    | 0.0017409    | 0.0043826    | 0.0017325    | 0.0019170   
-IKPy                      | 0.07299    | 0.0000734    | 0.0671459    | 0.0000723    | 0.0620768   
+FrankIK                   | 0.00002    | 0.0000024    | 0.0000065    | 0.0000027    | 0.0000065   
+FrankIKPinocchio          | 0.05501    | 0.0000027    | 0.0000222    | 0.0000026    | 0.0000253   
+RoboticstoolboxPython     | 1.02573    | 0.0000370    | 0.0000432    | 0.0000355    | 0.0000466   
+FastIK *                  | 0.00000    | 0.0000097    | 0.0000114    | 0.0000092    | 0.0000114   
+RoboticsLibrary *         | 0.00127    | 0.0000050    | 0.0001733    | 0.0000048    | 0.0001957   
+ManipulaPy                | 0.01993    | 0.0003581    | 0.0061437    | 0.0003641    | 0.0073780   
+GenesisWorld *            | 5.12017    | 0.0017409    | 0.0043826    | 0.0017325    | 0.0019170   
+IKPy                      | 0.07676    | 0.0000818    | 0.0739200    | 0.0000838    | 0.0685143   
 ===============================================================================================
+* not reproducible on the frankik 2 benchmark machine (no GPU / library not installable), kept from the frankik 1 run
 ```
 
 ![benchmark bar plot](benchmarks/benchmark_results.svg)

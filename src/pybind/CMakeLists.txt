@@ -1,6 +1,25 @@
 pybind11_add_module(_core MODULE bindings.cpp)
 target_link_libraries(_core PRIVATE Eigen3::Eigen)
 target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
-
-# in pip
 install(TARGETS _core DESTINATION frankik COMPONENT python_package)
+
+if(FRANKIK_WITH_PINOCCHIO STREQUAL "ON")
+    find_package(pinocchio REQUIRED)
+elseif(FRANKIK_WITH_PINOCCHIO STREQUAL "AUTO")
+    find_package(pinocchio)
+endif()
+
+if(pinocchio_FOUND)
+    if(APPLE)
+        set(_rpath_origin "@loader_path")
+    else()
+        set(_rpath_origin "$ORIGIN")
+    endif()
+    pybind11_add_module(_pin MODULE pin_bindings.cpp)
+    target_link_libraries(_pin PRIVATE Eigen3::Eigen pinocchio::all)
+    target_compile_definitions(_pin PRIVATE VERSION_INFO=${PROJECT_VERSION})
+    set_target_properties(_pin PROPERTIES INSTALL_RPATH "${_rpath_origin}/../cmeel.prefix/lib")
+    install(TARGETS _pin DESTINATION frankik COMPONENT python_package)
+else()
+    message(STATUS "frankik: building without the Pinocchio solver (_pin)")
+endif()

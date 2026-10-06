@@ -1,0 +1,96 @@
+{
+  "machine": "x86_64",
+  "benchmarks": [
+    {
+      "name": "FrankIK",
+      "status": "OK",
+      "t_init": 1.8490000002202578e-05,
+      "results": [
+        2.427001998967171e-06,
+        6.508983002277091e-06,
+        2.690751000045566e-06,
+        6.496793999531291e-06
+      ]
+    },
+    {
+      "name": "RoboticstoolboxPython",
+      "status": "OK",
+      "t_init": 1.0257286629998816,
+      "results": [
+        3.699462899771788e-05,
+        4.319090399417291e-05,
+        3.547024800241161e-05,
+        4.656586900205184e-05
+      ]
+    },
+    {
+      "name": "FastIK",
+      "status": "KEPT",
+      "error": "ModuleNotFoundError: No module named 'ikfast_franka_panda'",
+      "t_init": 0.0,
+      "results": [
+        9.7e-06,
+        1.14e-05,
+        9.2e-06,
+        1.14e-05
+      ]
+    },
+    {
+      "name": "FrankIKPinocchio",
+      "status": "OK",
+      "t_init": 0.05500565500005905,
+      "results": [
+        2.675162001423814e-06,
+        2.2226179002245772e-05,
+        2.629928996157105e-06,
+        2.5339551001479776e-05
+      ]
+    },
+    {
+      "name": "RoboticsLibrary",
+      "status": "KEPT",
+      "error": "ModuleNotFoundError: No module named 'rcs.common'",
+      "t_init": 0.00127,
+      "results": [
+        5e-06,
+        0.0001733,
+        4.8e-06,
+        0.0001957
+      ]
+    },
+    {
+      "name": "ManipulaPy",
+      "status": "OK",
+      "t_init": 0.01993433300003744,
+      "results": [
+        0.0003580621800006156,
+        0.006143659729002138,
+        0.00036413345699861564,
+        0.0073779647469996235
+      ]
+    },
+    {
+      "name": "GenesisWorld",
+      "status": "KEPT",
+      "error": "ModuleNotFoundError: No module named 'genesis'",
+      "t_init": 5.12017,
+      "results": [
+        0.0017409,
+        0.0043826,
+        0.0017325,
+        0.001917
+      ]
+    },
+    {
+      "name": "IKPy",
+      "status": "OK",
+      "t_init": 0.07675708800002212,
+      "results": [
+        8.178472999361475e-05,
+        0.0739200074500036,
+        8.383340001046236e-05,
+        0.06851434790001576
+      ]
+    }
+  ]
+}

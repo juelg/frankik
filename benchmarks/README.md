@@ -1,4 +1,10 @@
 # FrankIK Benchmark
+
+```shell
+python benchmarks.py                         # run what is installed
+python benchmarks.py benchmark_results_v1.json   # keep the frankik 1 numbers for libraries that cannot run
+```
+Results are written to `benchmark_results.json` and `benchmark_results.svg`.
 To run the benchmarks, install the dependencies below, then open the jupyter notebook [benchmarks.ipynb](benchmarks.ipynb) which contains the benchmark code.
 
 
