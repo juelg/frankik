@@ -187,3 +187,31 @@ def test_limits_respected():
         q = generate_random_q(q_min, q_max)
         assert np.all(q >= q_min)
         assert np.all(q <= q_max)
+
+
+def test_local_ik_across_shoulder_singularity():
+    """A seed on the other side of q2 = 0 must not push the local solver into the mirrored shoulder branch."""
+    q_min, q_max = np.array(frankik.q_min_fr3), np.array(frankik.q_max_fr3)
+    hand_inverse = frankik.pose_inverse(frankik.FrankaKinematics.FrankaHandTCPOffset)
+    for _ in range(200):
+        q = generate_random_q(q_min, q_max)
+        q[1] = np.random.uniform(0.02, 0.08) * np.random.choice([-1.0, 1.0])
+        seed = q.copy()
+        seed[1] = -seed[1]
+        q_sol = frankik.ik(frankik.fk(q) @ hand_inverse, seed, q[6], is_fr3=True)
+        assert not np.isnan(q_sol).any(), f"no local solution for q={q}"
+        np.testing.assert_allclose(q_sol, q, atol=1e-6, err_msg=f"mirrored branch chosen for q={q}")
+
+
+def test_local_tracking_through_shoulder_singularity():
+    """Tracking a path whose q2 crosses zero stays continuous in local mode."""
+    kinematics = frankik.FrankaKinematics(frankik.RobotType.FR3)
+    tcp = kinematics.FrankaHandTCPOffset
+    q = np.array([0.3, -0.3, 0.2, -2.0, 0.1, 1.9, 0.9])
+    q_prev = q.copy()
+    for q2 in np.linspace(-0.3, 0.3, 120):
+        q[1] = q2
+        q_sol = kinematics.inverse(kinematics.forward(q, tcp), q0=q_prev, tcp_offset=tcp, q7=q[6])
+        assert q_sol is not None, f"tracking lost at q2={q2:.3f}"
+        assert np.abs(q_sol - q_prev).max() < 0.1, f"joint jump at q2={q2:.3f}: {q_sol - q_prev}"
+        q_prev = q_sol
