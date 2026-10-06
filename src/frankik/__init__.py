@@ -249,6 +249,7 @@ class PinocchioKinematics(Kinematics):
         dof: int | None = None,
         q_home: np.ndarray | None = None,
         model_format: str = "auto",
+        nullspace_q: np.ndarray | None = None,
         parameters: _pin.ClikParameters | None = None,
         **solver_parameters: float | int | bool,
     ):
@@ -261,8 +262,11 @@ class PinocchioKinematics(Kinematics):
             dof: Number of controlled joints. Defaults to all joints of the model.
             q_home: Default IK seed. Defaults to the MJCF ``home`` keyframe or the neutral configuration.
             model_format: ``"auto"`` (by file extension), ``"mjcf"`` or ``"urdf"``.
+            nullspace_q: Posture the redundant degrees of freedom are pulled towards (``dof`` entries) by the
+                secondary task, e.g. to keep the elbow up. Enables the task with ``nullspace_gain`` 1 unless the gain
+                is given explicitly.
             parameters: Solver parameters, alternatively given as keyword arguments
-                (``eps``, ``max_iterations``, ``dt``, ``damping``, ``clamp_joint_limits``).
+                (``eps``, ``max_iterations``, ``dt``, ``damping``, ``clamp_joint_limits``, ``nullspace_gain``).
         """
         pin = _load_pin()
         self.robot_type = self._as_robot_type(model)
@@ -288,11 +292,15 @@ class PinocchioKinematics(Kinematics):
         if parameters is not None and solver_parameters:
             msg = "Give either `parameters` or individual solver parameters"
             raise TypeError(msg)
+        if nullspace_q is not None and parameters is None:
+            solver_parameters.setdefault("nullspace_gain", 1.0)
         parameters = parameters or pin.ClikParameters(**solver_parameters)
 
         self._impl: _pin.PinocchioKinematics = pin.PinocchioKinematics(
             str(path), tcp_frame, base_frame, dof, fmt, parameters
         )
+        if nullspace_q is not None:
+            self.nullspace_q = nullspace_q
         if q_home is not None:
             self.q_home = q_home
         elif self.robot_type is not None:
@@ -341,6 +349,15 @@ class PinocchioKinematics(Kinematics):
     @q_rest.setter
     def q_rest(self, value: np.ndarray) -> None:
         self._impl.q_rest = np.asarray(value, dtype=np.float64)
+
+    @property
+    def nullspace_q(self) -> np.ndarray:
+        """Posture (``dof``) the null space task pulls towards when ``parameters.nullspace_gain`` is positive."""
+        return self._impl.nullspace_q
+
+    @nullspace_q.setter
+    def nullspace_q(self, value: np.ndarray) -> None:
+        self._impl.nullspace_q = np.asarray(value, dtype=np.float64)
 
     @property
     def path(self) -> Path:

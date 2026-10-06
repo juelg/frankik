@@ -25,6 +25,7 @@ class ClikParameters:
         dt: float = 0.5,
         damping: float = 1e-06,
         clamp_joint_limits: bool = True,
+        nullspace_gain: float = 0.0,
     ) -> None: ...
     def __repr__(self) -> str: ...
     @property
@@ -59,6 +60,14 @@ class ClikParameters:
 
     @eps.setter
     def eps(self, arg0: float) -> None: ...
+    @property
+    def nullspace_gain(self) -> float:
+        """
+        Gain pulling the joints towards nullspace_q in the null space of the end-effector task, 0 disables it
+        """
+
+    @nullspace_gain.setter
+    def nullspace_gain(self, arg0: float) -> None: ...
 
 class ModelFormat:
     """
@@ -145,6 +154,14 @@ class PinocchioKinematics:
     @property
     def nq(self) -> int: ...
     @property
+    def nullspace_q(self) -> numpy.ndarray[tuple[M], numpy.dtype[numpy.float64]]:
+        """
+        Posture (dof) the null space task pulls towards
+        """
+
+    @nullspace_q.setter
+    def nullspace_q(self, arg1: numpy.ndarray[tuple[M], numpy.dtype[numpy.float64]]) -> None: ...
+    @property
     def path(self) -> str: ...
     @property
     def q_max(self) -> numpy.ndarray[tuple[M], numpy.dtype[numpy.float64]]: ...
@@ -163,5 +180,5 @@ class PinocchioKinematics:
     @property
     def tcp_frame(self) -> str: ...
 
-__version__: str = "1.0.0"
+__version__: str = "1.0.1"
 pinocchio_version: str = "3.7.0"

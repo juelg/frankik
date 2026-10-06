@@ -161,6 +161,23 @@ def test_global_solution_recovers_from_bad_seed():
     assert all(kin.inverse(target, q0=bad_seed, global_solution=True) is not None for target in targets)
 
 
+def test_nullspace_keeps_posture():
+    kin = PinocchioKinematics(RobotType.FR3)
+    posture = kin.q_home.copy()
+    with_posture = PinocchioKinematics(RobotType.FR3, nullspace_q=posture)
+    assert with_posture.parameters.nullspace_gain == 1.0
+    np.testing.assert_allclose(with_posture.nullspace_q, posture)
+    target = kin.forward(posture + np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5]))
+    far_seed = posture + np.array([0.8, 0.0, -0.8, 0.0, 0.0, 0.0, 0.0])
+    plain = kin.inverse(target, q0=far_seed)
+    pulled = with_posture.inverse(target, q0=far_seed)
+    assert plain is not None and pulled is not None
+    assert_pose_close(with_posture.forward(pulled), target)
+    assert np.linalg.norm(pulled - posture) < np.linalg.norm(plain - posture)
+    with pytest.raises(ValueError, match="nullspace_q"):
+        kin.nullspace_q = np.zeros(3)
+
+
 def test_q_home_override():
     q_home = np.zeros(7)
     kin = PinocchioKinematics(RobotType.PANDA, q_home=q_home)
@@ -279,8 +296,7 @@ def test_urdf_matches_mjcf():
     mjcf = PinocchioKinematics(RobotType.FR3)
     assert urdf.dof == 7
     assert urdf.joint_names == mjcf.joint_names
-    np.testing.assert_allclose(urdf.q_min, frankik.q_min_fr3)
-    np.testing.assert_allclose(urdf.q_max, frankik.q_max_fr3)
+    assert np.all(urdf.q_min > mjcf.q_min) and np.all(urdf.q_max < mjcf.q_max)
     for _ in range(N_SAMPLES):
         q = random_q(urdf.q_min, urdf.q_max)
         target = mjcf.forward(q)

@@ -31,6 +31,9 @@ struct ClikParameters {
   double dt = 0.5;
   double damping = 1e-6;
   bool clamp_joint_limits = true;
+  // Gain of the secondary task that pulls the controlled joints towards
+  // `nullspace_q` without disturbing the end-effector (0 disables it).
+  double nullspace_gain = 0.0;
 };
 
 // Forward kinematics and damped least squares closed-loop inverse kinematics
@@ -75,6 +78,7 @@ class PinocchioKinematics {
                                   std::to_string(dof_));
     }
     q_rest_ = pinocchio::neutral(model_);
+    nullspace_q_ = pinocchio::neutral(model_).head(dof_);
   }
 
   Eigen::Matrix4d forward(
@@ -134,6 +138,14 @@ class PinocchioKinematics {
     }
     q_rest_ = q_rest;
   }
+  const Eigen::VectorXd& nullspace_q() const { return nullspace_q_; }
+  void set_nullspace_q(const Eigen::VectorXd& q) {
+    if (q.size() != dof_) {
+      throw std::invalid_argument(
+          "nullspace_q must have dof=" + std::to_string(dof_) + " entries");
+    }
+    nullspace_q_ = q;
+  }
   const ClikParameters& parameters() const { return parameters_; }
   void set_parameters(const ClikParameters& parameters) {
     parameters_ = parameters;
@@ -190,7 +202,18 @@ class PinocchioKinematics {
       J.rightCols(model_.nv - dof_).setZero();
       JJt.noalias() = J * J.transpose();
       JJt.diagonal().array() += parameters_.damping;
-      v.noalias() = -J.transpose() * JJt.ldlt().solve(err);
+      if (parameters_.nullspace_gain > 0.0) {
+        const Eigen::MatrixXd J_pinv =
+            J.transpose() *
+            JJt.ldlt().solve(pinocchio::Data::Matrix6::Identity());
+        Eigen::VectorXd posture = Eigen::VectorXd::Zero(model_.nv);
+        posture.head(dof_) =
+            parameters_.nullspace_gain * (nullspace_q_ - q.head(dof_));
+        v.noalias() = -J_pinv * err;
+        v.noalias() += posture - J_pinv * (J * posture);
+      } else {
+        v.noalias() = -J.transpose() * JJt.ldlt().solve(err);
+      }
       q = pinocchio::integrate(model_, q, v * parameters_.dt);
       if (parameters_.clamp_joint_limits) {
         q.head(dof_) = q.head(dof_).cwiseMax(q_min).cwiseMin(q_max);
@@ -263,6 +286,7 @@ class PinocchioKinematics {
   std::optional<pinocchio::FrameIndex> base_frame_id_;
   int dof_ = 0;
   Eigen::VectorXd q_rest_;
+  Eigen::VectorXd nullspace_q_;
 };
 
 }  // namespace frankik
