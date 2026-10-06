@@ -9,6 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "pinocchio/algorithm/frames.hpp"
@@ -107,6 +108,12 @@ class PinocchioKinematics {
     if (const auto solution = solve(target, q)) {
       return solution;
     }
+    // the posture task must never cost a solution
+    if (parameters_.nullspace_gain > 0.0) {
+      if (const auto solution = solve(target, q, 0.0)) {
+        return solution;
+      }
+    }
     if (!global_solution) {
       return std::nullopt;
     }
@@ -181,6 +188,12 @@ class PinocchioKinematics {
   // and is the next step if the solver needs to get faster.
   std::optional<Eigen::VectorXd> solve(const pinocchio::SE3& target,
                                        Eigen::VectorXd q) {
+    return solve(target, std::move(q), parameters_.nullspace_gain);
+  }
+
+  std::optional<Eigen::VectorXd> solve(const pinocchio::SE3& target,
+                                       Eigen::VectorXd q,
+                                       double nullspace_gain) {
     const auto q_min = model_.lowerPositionLimit.head(dof_);
     const auto q_max = model_.upperPositionLimit.head(dof_);
     pinocchio::Data::Matrix6x J = pinocchio::Data::Matrix6x::Zero(6, model_.nv);
@@ -195,7 +208,7 @@ class PinocchioKinematics {
       const pinocchio::Motion::Vector6 err = pinocchio::log6(iMd).toVector();
       // with an active posture task the first iteration always runs so that
       // a pose that is already reached still moves towards the posture
-      const bool posture_pending = parameters_.nullspace_gain > 0.0 && i == 0;
+      const bool posture_pending = nullspace_gain > 0.0 && i == 0;
       if (err.norm() < parameters_.eps && !posture_pending) {
         return Eigen::VectorXd(q.head(dof_));
       }
@@ -205,13 +218,12 @@ class PinocchioKinematics {
       J.rightCols(model_.nv - dof_).setZero();
       JJt.noalias() = J * J.transpose();
       JJt.diagonal().array() += parameters_.damping;
-      if (parameters_.nullspace_gain > 0.0) {
+      if (nullspace_gain > 0.0) {
         const Eigen::MatrixXd J_pinv =
             J.transpose() *
             JJt.ldlt().solve(pinocchio::Data::Matrix6::Identity());
         // the posture step per iteration is at most the full distance
-        const double gain =
-            std::min(parameters_.nullspace_gain, 1.0 / parameters_.dt);
+        const double gain = std::min(nullspace_gain, 1.0 / parameters_.dt);
         Eigen::VectorXd posture = Eigen::VectorXd::Zero(model_.nv);
         posture.head(dof_) = gain * (nullspace_q_ - q.head(dof_));
         v.noalias() = -J_pinv * err;
