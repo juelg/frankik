@@ -179,7 +179,7 @@ def test_nullspace_keeps_posture():
     assert swung is not None and np.linalg.norm(swung - posture) > 1.0
     settled = with_posture.inverse(kin.forward(posture), q0=swung)
     assert settled is not None and np.linalg.norm(settled - posture) < 0.01
-    assert_pose_close(with_posture.forward(settled), kin.forward(posture), atol=1e-5)
+    assert_pose_close(with_posture.forward(settled), kin.forward(posture))
     with pytest.raises(ValueError, match="nullspace_q"):
         kin.nullspace_q = np.zeros(3)
 
